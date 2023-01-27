@@ -1,0 +1,7 @@
+name: sample-cluster
+region: "us-east-2"
+instanceTypes:
+  - "t3.micro"
+tags:
+  tier: test
+
