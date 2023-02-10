@@ -69,17 +69,19 @@ func NewResourceConfig() *ResourceConfig {
 // ResourceInventory contains a record of all resources created so they can be
 // referenced and cleaned up.
 type ResourceInventory struct {
-	Region               string        `json:"region"`
-	VPCID                string        `json:"vpcID"`
-	SubnetIDs            []string      `json:"subnetIDs"`
-	InternetGatewayID    string        `json:"internetGatewayID"`
-	ElasticIPIDs         []string      `json:"elasticIPIDs"`
-	PrivateRouteTableIDs []string      `json:"privateRouteTableIDs"`
-	PublicRouteTableID   string        `json:"publicRouteTableID"`
-	ClusterRole          RoleInventory `json:"clusterRole"`
-	WorkerRole           RoleInventory `json:"workerRole"`
-	ClusterName          string        `json:"clusterName"`
-	NodeGroupNames       []string      `json:"nodeGroupNames"`
+	Region                 string           `json:"region"`
+	VPCID                  string           `json:"vpcID"`
+	SubnetIDs              []string         `json:"subnetIDs"`
+	InternetGatewayID      string           `json:"internetGatewayID"`
+	ElasticIPIDs           []string         `json:"elasticIPIDs"`
+	PrivateRouteTableIDs   []string         `json:"privateRouteTableIDs"`
+	PublicRouteTableID     string           `json:"publicRouteTableID"`
+	ClusterRole            RoleInventory    `json:"clusterRole"`
+	WorkerRole             RoleInventory    `json:"workerRole"`
+	DNSManagementPolicyARN string           `json:"dnsManagementPolicyARN"`
+	Cluster                ClusterInventory `json:"cluster"`
+	NodeGroupNames         []string         `json:"nodeGroupNames"`
+	OIDCProviderARN        string           `json:"oidcProviderARN"`
 }
 
 // RoleInventory contains the details for each role created.
@@ -89,10 +91,17 @@ type RoleInventory struct {
 	RolePolicyARNs []string `json:"rolePolicyARNs"`
 }
 
+// ClusterInventory contains the details for the EKS cluster.
+type ClusterInventory struct {
+	ClusterName     string `json:"clusterName"`
+	ClusterARN      string `json:"clusterARN"`
+	OIDCProviderURL string `json:"oidcProviderURL"`
+}
+
 var ErrResourceNotFound = errors.New("resource not found")
 
 // CreateResourceStack creates all the resources for an EKS cluster.
-func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInventory, error) {
+func (c *ResourceClient) CreateResourceStack(r *ResourceConfig, dnsManagement bool) (*ResourceInventory, error) {
 	inventory := ResourceInventory{Region: r.Region}
 
 	// Tags
@@ -199,6 +208,20 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 			privateRouteTableIDs, *publicRouteTable.RouteTableId)
 	}
 
+	// IAM Policy for DNS management
+	if dnsManagement {
+		dnsPolicy, err := c.CreatePolicy(iamTags)
+		if dnsPolicy != nil {
+			inventory.DNSManagementPolicyARN = *dnsPolicy.Arn
+		}
+		if err != nil {
+			return &inventory, err
+		}
+		if c.MessageChan != nil {
+			*c.MessageChan <- fmt.Sprintf("IAM policy created: %s\n", *dnsPolicy.PolicyName)
+		}
+	}
+
 	// IAM Roles
 	clusterRole, workerRole, err := c.CreateRoles(iamTags)
 	if clusterRole != nil {
@@ -226,7 +249,9 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 	cluster, err := c.CreateCluster(&mapTags, r.Name, r.KubernetesVersion,
 		*clusterRole.Arn, privateSubnetIDs)
 	if cluster != nil {
-		inventory.ClusterName = *cluster.Name
+		inventory.Cluster.ClusterName = *cluster.Name
+		inventory.Cluster.ClusterARN = *cluster.Arn
+		inventory.Cluster.OIDCProviderURL = *cluster.Identity.Oidc.Issuer
 	}
 	if err != nil {
 		return &inventory, err
@@ -269,20 +294,33 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("EKS cluster creation complete: %s\n", *cluster.Name)
 	}
+
+	// OIDC Provider
+	oidcProviderARN, err := c.CreateOIDCProvider(iamTags, *cluster.Identity.Oidc.Issuer)
+	if oidcProviderARN != "" {
+		inventory.OIDCProviderARN = oidcProviderARN
+	}
+	if err != nil {
+		return &inventory, err
+	}
+	if c.MessageChan != nil {
+		*c.MessageChan <- fmt.Sprintf("OIDC provider created: %s\n", oidcProviderARN)
+	}
+
 	return &inventory, nil
 }
 
 // DeleteResourceStack deletes all the resources in the resource inventory.
 func (c *ResourceClient) DeleteResourceStack(r *ResourceInventory) error {
 	// Node Groups
-	if err := c.DeleteNodeGroups(r.ClusterName, r.NodeGroupNames); err != nil {
+	if err := c.DeleteNodeGroups(r.Cluster.ClusterName, r.NodeGroupNames); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("Node groups deletion initiated: %s\n", r.NodeGroupNames)
 		*c.MessageChan <- fmt.Sprintf("Waiting for node groups to be deleted: %s\n", r.NodeGroupNames)
 	}
-	if err := c.WaitForNodeGroups(r.ClusterName, r.NodeGroupNames, NodeGroupConditionDeleted); err != nil {
+	if err := c.WaitForNodeGroups(r.Cluster.ClusterName, r.NodeGroupNames, NodeGroupConditionDeleted); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
@@ -290,18 +328,18 @@ func (c *ResourceClient) DeleteResourceStack(r *ResourceInventory) error {
 	}
 
 	// EKS Cluster
-	if err := c.DeleteCluster(r.ClusterName); err != nil {
+	if err := c.DeleteCluster(r.Cluster.ClusterName); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion initiated: %s\n", r.ClusterName)
-		*c.MessageChan <- fmt.Sprintf("Waiting for EKS cluster to be deleted: %s\n", r.ClusterName)
+		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion initiated: %s\n", r.Cluster.ClusterName)
+		*c.MessageChan <- fmt.Sprintf("Waiting for EKS cluster to be deleted: %s\n", r.Cluster.ClusterName)
 	}
-	if err := c.WaitForCluster(r.ClusterName, ClusterConditionDeleted); err != nil {
+	if err := c.WaitForCluster(r.Cluster.ClusterName, ClusterConditionDeleted); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion complete: %s\n", r.ClusterName)
+		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion complete: %s\n", r.Cluster.ClusterName)
 	}
 
 	// IAM Roles
@@ -310,6 +348,14 @@ func (c *ResourceClient) DeleteResourceStack(r *ResourceInventory) error {
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("IAM roles deleted: [%s %s]\n", &r.ClusterRole, &r.WorkerRole)
+	}
+
+	// IAM Policy
+	if err := c.DeletePolicy(r.DNSManagementPolicyARN); err != nil {
+		return err
+	}
+	if c.MessageChan != nil {
+		*c.MessageChan <- fmt.Sprintf("IAM policy deleted: %s\n", r.DNSManagementPolicyARN)
 	}
 
 	// NAT Gateways
