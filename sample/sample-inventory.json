@@ -1,0 +1,57 @@
+{
+  "region": "us-east-2",
+  "vpcID": "vpc-0f35f80fd082adece",
+  "subnetIDs": [
+    "subnet-08d37e4dc31ff3ca3",
+    "subnet-042274a3d7c31efe3",
+    "subnet-0a2bce51204470672",
+    "subnet-064cc1b9462e88976",
+    "subnet-042b0401d946544ff",
+    "subnet-0d0aa442b8e88d2c7"
+  ],
+  "internetGatewayID": "igw-09b2276627dab4bfb",
+  "elasticIPIDs": [
+    "eipalloc-0a8b3200fc0a3a157",
+    "eipalloc-09b9f94c80563c34e",
+    "eipalloc-080234a0b6c81341f"
+  ],
+  "privateRouteTableIDs": [
+    "rtb-07af4f06bca4ef539",
+    "rtb-02b325692b8473baa",
+    "rtb-08f28975ea0912e59"
+  ],
+  "publicRouteTableID": "rtb-02933d64871cb96bf",
+  "clusterRole": {
+    "roleName": "eks-cluster-role",
+    "roleARN": "arn:aws:iam::575822346426:role/eks-cluster-role",
+    "rolePolicyARNs": [
+      "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+    ]
+  },
+  "workerRole": {
+    "roleName": "eks-cluster-workler-role",
+    "roleARN": "arn:aws:iam::575822346426:role/eks-cluster-workler-role",
+    "rolePolicyARNs": [
+      "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+      "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+      "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+    ]
+  },
+  "dnsManagementRole": {
+    "roleName": "eks-cluster-dns-management-role",
+    "roleARN": "arn:aws:iam::575822346426:role/eks-cluster-dns-management-role",
+    "rolePolicyARNs": [
+      "arn:aws:iam::575822346426:policy/DNSUpdates"
+    ]
+  },
+  "dnsManagementPolicyARN": "arn:aws:iam::575822346426:policy/DNSUpdates",
+  "cluster": {
+    "clusterName": "sample-cluster",
+    "clusterARN": "arn:aws:eks:us-east-2:575822346426:cluster/sample-cluster",
+    "oidcProviderURL": "https://oidc.eks.us-east-2.amazonaws.com/id/155653C79E97FD9B354505C406EB250A"
+  },
+  "nodeGroupNames": [
+    "sample-cluster-private-node-group"
+  ],
+  "oidcProviderARN": "arn:aws:iam::575822346426:oidc-provider/oidc.eks.us-east-2.amazonaws.com/id/155653C79E97FD9B354505C406EB250A"
+}

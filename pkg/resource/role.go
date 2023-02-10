@@ -11,6 +11,7 @@ import (
 const (
 	ClusterRoleName            = "eks-cluster-role"
 	WorkerRoleName             = "eks-cluster-workler-role"
+	DNSManagementRoleName      = "eks-cluster-dns-management-role"
 	ClusterPolicyARN           = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 	WorkerNodePolicyARN        = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
 	ContainerRegistryPolicyARN = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
@@ -97,63 +98,96 @@ func (c *ResourceClient) CreateRoles(tags *[]types.Tag) (*types.Role, *types.Rol
 	return clusterRoleResp.Role, workerRoleResp.Role, nil
 }
 
-// DeleteRoles deletes the IAM roles used by EKS.  If empty role names are
-// provided, or if the roles are not found it returns without error.
-func (c *ResourceClient) DeleteRoles(clusterRole, workerRole *RoleInventory) error {
+// CreateDNSManagementRole creates the IAM role needed for DNS management by
+// the Kubernetes service account of an in-cluster supporting service such as
+// external-dns using IRSA (IAM role for service accounts).
+func (c *ResourceClient) CreateDNSManagementRole(
+	tags *[]types.Tag,
+	dnsPolicyARN string,
+	awsAccountID string,
+	oidcProvider string,
+	serviceAccount *DNSManagementServiceAccount,
+) (*types.Role, error) {
 	svc := iam.NewFromConfig(c.AWSConfig)
 
-	if clusterRole.RoleName != "" {
-		for _, policyARN := range clusterRole.RolePolicyARNs {
-			clusterDetachRolePolicyInput := iam.DetachRolePolicyInput{
-				PolicyArn: &policyARN,
-				RoleName:  &clusterRole.RoleName,
-			}
-			_, err := svc.DetachRolePolicy(c.Context, &clusterDetachRolePolicyInput)
-			if err != nil {
-				var noSuchEntityErr *types.NoSuchEntityException
-				if errors.As(err, &noSuchEntityErr) {
-					return nil
-				} else {
-					return fmt.Errorf("failed to detach policy %s from role %s: %w", policyARN, clusterRole.RoleName, err)
-				}
-			}
-		}
-		deleteClusterRoleInput := iam.DeleteRoleInput{RoleName: &clusterRole.RoleName}
-		_, err := svc.DeleteRole(c.Context, &deleteClusterRoleInput)
-		if err != nil {
-			var noSuchEntityErr *types.NoSuchEntityException
-			if errors.As(err, &noSuchEntityErr) {
-				return nil
-			} else {
-				return fmt.Errorf("failed to delete role %s: %w", clusterRole.RoleName, err)
-			}
-		}
+	dnsManagementRoleName := DNSManagementRoleName
+	dnsManagementRolePolicyDocument := fmt.Sprintf(`{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": "arn:aws:iam::%[1]s:oidc-provider/%[2]s"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+                "StringEquals": {
+                    "%[2]s:sub": "system:serviceaccount:%[3]s:%[4]s",
+                    "%[2]s:aud": "sts.amazonaws.com"
+                }
+            }
+        }
+    ]
+}`, awsAccountID, oidcProvider, serviceAccount.Namespace, serviceAccount.Name)
+	createDNSManagementRoleInput := iam.CreateRoleInput{
+		AssumeRolePolicyDocument: &dnsManagementRolePolicyDocument,
+		RoleName:                 &dnsManagementRoleName,
+		PermissionsBoundary:      &dnsPolicyARN,
+		Tags:                     *tags,
+	}
+	dnsManagementRoleResp, err := svc.CreateRole(c.Context, &createDNSManagementRoleInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create role %s: %w", dnsManagementRoleName, err)
 	}
 
-	if workerRole.RoleName != "" {
-		for _, policyARN := range workerRole.RolePolicyARNs {
-			workerDetachRolePolicyInput := iam.DetachRolePolicyInput{
+	attachDNSManagementRolePolicyInput := iam.AttachRolePolicyInput{
+		PolicyArn: &dnsPolicyARN,
+		RoleName:  dnsManagementRoleResp.Role.RoleName,
+	}
+	_, err = svc.AttachRolePolicy(c.Context, &attachDNSManagementRolePolicyInput)
+	if err != nil {
+		return dnsManagementRoleResp.Role, fmt.Errorf("failed to attach role policy %s to %s: %w", dnsPolicyARN, dnsManagementRoleName, err)
+	}
+
+	return dnsManagementRoleResp.Role, nil
+}
+
+// DeleteRoles deletes the IAM roles used by EKS.  If empty role names are
+// provided, or if the roles are not found it returns without error.
+// func (c *ResourceClient) DeleteRoles(clusterRole, workerRole *RoleInventory) error {
+func (c *ResourceClient) DeleteRoles(roles *[]RoleInventory) error {
+	svc := iam.NewFromConfig(c.AWSConfig)
+
+	// if roles are empty, there's nothing to delete
+	if len(*roles) == 0 {
+		return nil
+	}
+
+	for _, role := range *roles {
+
+		for _, policyARN := range role.RolePolicyARNs {
+			detachRolePolicyInput := iam.DetachRolePolicyInput{
 				PolicyArn: &policyARN,
-				RoleName:  &workerRole.RoleName,
+				RoleName:  &role.RoleName,
 			}
-			_, err := svc.DetachRolePolicy(c.Context, &workerDetachRolePolicyInput)
+			_, err := svc.DetachRolePolicy(c.Context, &detachRolePolicyInput)
 			if err != nil {
 				var noSuchEntityErr *types.NoSuchEntityException
 				if errors.As(err, &noSuchEntityErr) {
 					return nil
 				} else {
-					return fmt.Errorf("failed to detach policy %s from role %s: %w", policyARN, workerRole.RoleName, err)
+					return fmt.Errorf("failed to detach policy %s from role %s: %w", policyARN, role.RoleName, err)
 				}
 			}
 		}
-		deleteWorkerRoleInput := iam.DeleteRoleInput{RoleName: &workerRole.RoleName}
-		_, err := svc.DeleteRole(c.Context, &deleteWorkerRoleInput)
+		deleteRoleInput := iam.DeleteRoleInput{RoleName: &role.RoleName}
+		_, err := svc.DeleteRole(c.Context, &deleteRoleInput)
 		if err != nil {
 			var noSuchEntityErr *types.NoSuchEntityException
 			if errors.As(err, &noSuchEntityErr) {
 				return nil
 			} else {
-				return fmt.Errorf("failed to delete role %s: %w", workerRole.RoleName, err)
+				return fmt.Errorf("failed to delete role %s: %w", role.RoleName, err)
 			}
 		}
 	}

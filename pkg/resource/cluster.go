@@ -78,42 +78,48 @@ func (c *ResourceClient) DeleteCluster(clusterName string) error {
 // WaitForCluster waits until a cluster reaches a certain condition.  One of:
 // * ClusterConditionCreated
 // * ClusterConditionDeleted
-func (c *ResourceClient) WaitForCluster(clusterName string, clusterCondition ClusterCondition) error {
+func (c *ResourceClient) WaitForCluster(
+	clusterName string,
+	clusterCondition ClusterCondition,
+) (string, error) {
+	var oicdIssuer string
+
 	// if no cluster, there's nothing to check
 	if clusterName == "" {
-		return nil
+		return oicdIssuer, nil
 	}
 
 	clusterCheckCount := 0
 	for {
 		clusterCheckCount += 1
 		if clusterCheckCount > ClusterCheckMaxCount {
-			return errors.New("cluster condition check timed out")
+			return oicdIssuer, errors.New("cluster condition check timed out")
 		}
 
-		clusterState, err := c.getClusterStatus(clusterName)
+		cluster, err := c.getCluster(clusterName)
 		if err != nil {
 			if errors.Is(err, ErrResourceNotFound) && clusterCondition == ClusterConditionDeleted {
 				// resource was not found and we're waiting for it to be
 				// deleted so condition is met
 				break
 			} else {
-				return fmt.Errorf("failed to get cluster status while waiting for %s: %w", clusterName, err)
+				return oicdIssuer, fmt.Errorf("failed to get cluster status while waiting for %s: %w", clusterName, err)
 			}
 		}
-		if *clusterState == types.ClusterStatusActive && clusterCondition == ClusterConditionCreated {
+		if cluster.Status == types.ClusterStatusActive && clusterCondition == ClusterConditionCreated {
 			// resource is available and we're waiting for it to be created
 			// so condition is met
+			oicdIssuer = *cluster.Identity.Oidc.Issuer
 			break
 		}
 		time.Sleep(time.Second * 15)
 	}
 
-	return nil
+	return oicdIssuer, nil
 }
 
-// getClusterStatus retrieves the cluster status for a given cluster name.
-func (c *ResourceClient) getClusterStatus(clusterName string) (*types.ClusterStatus, error) {
+// getCluster retrieves the cluster for a given cluster name.
+func (c *ResourceClient) getCluster(clusterName string) (*types.Cluster, error) {
 	svc := eks.NewFromConfig(c.AWSConfig)
 
 	describeClusterInput := eks.DescribeClusterInput{
@@ -129,5 +135,5 @@ func (c *ResourceClient) getClusterStatus(clusterName string) (*types.ClusterSta
 		}
 	}
 
-	return &resp.Cluster.Status, nil
+	return resp.Cluster, nil
 }

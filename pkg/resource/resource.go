@@ -18,14 +18,18 @@ type ResourceClient struct {
 
 // ResourceConfig contains the configuration options for an EKS cluster.
 type ResourceConfig struct {
-	Name              string             `yaml:"name"`
-	KubernetesVersion string             `yaml:"kubernetesVersion"`
-	Region            string             `yaml:"region"`
-	ClusterCIDR       string             `yaml:"clusterCIDR"`
-	AvailabilityZones []AvailabilityZone `yaml:"availabilityZones"`
-	InstanceTypes     []string           `yaml:"instanceTypes"`
-	KeyPair           string             `yaml:"keyPair"`
-	Tags              map[string]string  `yaml:"tags"`
+	Name                        string                      `yaml:"name"`
+	Region                      string                      `yaml:"region"`
+	AWSAccountID                string                      `yaml:"awsAccountID"`
+	KubernetesVersion           string                      `yaml:"kubernetesVersion"`
+	ClusterCIDR                 string                      `yaml:"clusterCIDR"`
+	AvailabilityZones           []AvailabilityZone          `yaml:"availabilityZones"`
+	InstanceTypes               []string                    `yaml:"instanceTypes"`
+	MaxNodes                    int32                       `yaml:"maxNodes"`
+	DNSManagement               bool                        `yaml:"dnsManagement"`
+	DNSManagementServiceAccount DNSManagementServiceAccount `yaml:"dnsManagementServiceAccount"`
+	KeyPair                     string                      `yaml:"keyPair"`
+	Tags                        map[string]string           `yaml:"tags"`
 }
 
 // AvailabilityZone contains configuration options for an EKS cluster
@@ -38,6 +42,13 @@ type AvailabilityZone struct {
 	PublicSubnetCIDR  string `yaml:"publicSubnetCIDR"`
 	PublicSubnetID    string
 	NATGatewayID      string
+}
+
+// DNSManagementServiceAccount contains the name and namespace for the
+// Kubernetes service account that needs access to manage Route53 DNS records.
+type DNSManagementServiceAccount struct {
+	Name      string `yaml:"name"`
+	Namespace string `yaml:"namespace"`
 }
 
 // NewResourceConfig returns a ResourceConfig with default values set.
@@ -78,6 +89,7 @@ type ResourceInventory struct {
 	PublicRouteTableID     string           `json:"publicRouteTableID"`
 	ClusterRole            RoleInventory    `json:"clusterRole"`
 	WorkerRole             RoleInventory    `json:"workerRole"`
+	DNSManagementRole      RoleInventory    `json:"dnsManagementRole"`
 	DNSManagementPolicyARN string           `json:"dnsManagementPolicyARN"`
 	Cluster                ClusterInventory `json:"cluster"`
 	NodeGroupNames         []string         `json:"nodeGroupNames"`
@@ -101,7 +113,7 @@ type ClusterInventory struct {
 var ErrResourceNotFound = errors.New("resource not found")
 
 // CreateResourceStack creates all the resources for an EKS cluster.
-func (c *ResourceClient) CreateResourceStack(r *ResourceConfig, dnsManagement bool) (*ResourceInventory, error) {
+func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInventory, error) {
 	inventory := ResourceInventory{Region: r.Region}
 
 	// Tags
@@ -209,7 +221,7 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig, dnsManagement bo
 	}
 
 	// IAM Policy for DNS management
-	if dnsManagement {
+	if r.DNSManagement {
 		dnsPolicy, err := c.CreatePolicy(iamTags)
 		if dnsPolicy != nil {
 			inventory.DNSManagementPolicyARN = *dnsPolicy.Arn
@@ -251,7 +263,6 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig, dnsManagement bo
 	if cluster != nil {
 		inventory.Cluster.ClusterName = *cluster.Name
 		inventory.Cluster.ClusterARN = *cluster.Arn
-		inventory.Cluster.OIDCProviderURL = *cluster.Identity.Oidc.Issuer
 	}
 	if err != nil {
 		return &inventory, err
@@ -260,7 +271,11 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig, dnsManagement bo
 		*c.MessageChan <- fmt.Sprintf("EKS cluster created: %s\n", *cluster.Name)
 		*c.MessageChan <- fmt.Sprintf("Waiting for EKS cluster to become active: %s\n", *cluster.Name)
 	}
-	if err := c.WaitForCluster(*cluster.Name, ClusterConditionCreated); err != nil {
+	oidcIssuer, err := c.WaitForCluster(*cluster.Name, ClusterConditionCreated)
+	if oidcIssuer != "" {
+		inventory.Cluster.OIDCProviderURL = oidcIssuer
+	}
+	if err != nil {
 		return &inventory, err
 	}
 	if c.MessageChan != nil {
@@ -270,7 +285,7 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig, dnsManagement bo
 	// Node Groups
 	var nodeGroupNames []string
 	nodeGroups, err := c.CreateNodeGroups(&mapTags, *cluster.Name, r.KubernetesVersion,
-		*workerRole.Arn, privateSubnetIDs, r.InstanceTypes, r.KeyPair)
+		*workerRole.Arn, privateSubnetIDs, r.InstanceTypes, r.MaxNodes, r.KeyPair)
 	if nodeGroups != nil {
 		for _, nodeGroup := range *nodeGroups {
 			nodeGroupNames = append(nodeGroupNames, *nodeGroup.NodegroupName)
@@ -296,7 +311,7 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig, dnsManagement bo
 	}
 
 	// OIDC Provider
-	oidcProviderARN, err := c.CreateOIDCProvider(iamTags, *cluster.Identity.Oidc.Issuer)
+	oidcProviderARN, err := c.CreateOIDCProvider(iamTags, oidcIssuer)
 	if oidcProviderARN != "" {
 		inventory.OIDCProviderARN = oidcProviderARN
 	}
@@ -307,11 +322,38 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig, dnsManagement bo
 		*c.MessageChan <- fmt.Sprintf("OIDC provider created: %s\n", oidcProviderARN)
 	}
 
+	// IAM Role for DNS Management
+	if r.DNSManagement {
+		if inventory.DNSManagementPolicyARN == "" {
+			return &inventory, errors.New("no DNS policy ARN to attach to DNS management role")
+		}
+		dnsManagementRole, err := c.CreateDNSManagementRole(iamTags, inventory.DNSManagementPolicyARN,
+			r.AWSAccountID, oidcIssuer, &r.DNSManagementServiceAccount)
+		if dnsManagementRole != nil {
+			inventory.DNSManagementRole = RoleInventory{
+				RoleName:       *dnsManagementRole.RoleName,
+				RoleARN:        *dnsManagementRole.Arn,
+				RolePolicyARNs: []string{inventory.DNSManagementPolicyARN},
+			}
+		}
+		if err != nil {
+			return &inventory, err
+		}
+	}
+
 	return &inventory, nil
 }
 
 // DeleteResourceStack deletes all the resources in the resource inventory.
 func (c *ResourceClient) DeleteResourceStack(r *ResourceInventory) error {
+	// OIDC Provider
+	if err := c.DeleteOIDCProvider(r.OIDCProviderARN); err != nil {
+		return err
+	}
+	if c.MessageChan != nil {
+		*c.MessageChan <- fmt.Sprintf("OIDC provider deleted: %s\n", r.OIDCProviderARN)
+	}
+
 	// Node Groups
 	if err := c.DeleteNodeGroups(r.Cluster.ClusterName, r.NodeGroupNames); err != nil {
 		return err
@@ -335,7 +377,7 @@ func (c *ResourceClient) DeleteResourceStack(r *ResourceInventory) error {
 		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion initiated: %s\n", r.Cluster.ClusterName)
 		*c.MessageChan <- fmt.Sprintf("Waiting for EKS cluster to be deleted: %s\n", r.Cluster.ClusterName)
 	}
-	if err := c.WaitForCluster(r.Cluster.ClusterName, ClusterConditionDeleted); err != nil {
+	if _, err := c.WaitForCluster(r.Cluster.ClusterName, ClusterConditionDeleted); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
@@ -343,7 +385,9 @@ func (c *ResourceClient) DeleteResourceStack(r *ResourceInventory) error {
 	}
 
 	// IAM Roles
-	if err := c.DeleteRoles(&r.ClusterRole, &r.WorkerRole); err != nil {
+	iamRoles := []RoleInventory{r.ClusterRole, r.WorkerRole, r.DNSManagementRole}
+	//if err := c.DeleteRoles(&r.ClusterRole, &r.WorkerRole); err != nil {
+	if err := c.DeleteRoles(&iamRoles); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {

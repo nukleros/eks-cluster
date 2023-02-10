@@ -19,7 +19,6 @@ import (
 var (
 	inventoryFileOut string
 	configFile       string
-	dnsManagement    bool
 )
 
 // createCmd represents the create command
@@ -56,7 +55,7 @@ var createCmd = &cobra.Command{
 
 		// create resources
 		fmt.Println("Creating resources for EKS cluster...")
-		inventory, err := resourceClient.CreateResourceStack(resourceConfig, dnsManagement)
+		inventory, err := resourceClient.CreateResourceStack(resourceConfig)
 		if err != nil {
 			fmt.Println("Problem encountered creating resources - deleting resources that were created")
 			if deleteErr := resourceClient.DeleteResourceStack(inventory); deleteErr != nil {
@@ -81,9 +80,8 @@ var createCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(createCmd)
 
-	createCmd.Flags().StringVarP(&configFile, "config-file", "c", "", "File to read EKS cluster config from")
+	createCmd.Flags().StringVarP(&configFile, "config-file", "c", "",
+		"File to read EKS cluster config from")
 	createCmd.Flags().StringVarP(&inventoryFileOut, "inventory-file", "i",
 		"eks-cluster-inventory.json", "File to write resource inventory to")
-	createCmd.Flags().BoolVarP(&dnsManagement, "dns-management", "d", true,
-		"Create service account IAM policies and roles for DNS management with Route53")
 }

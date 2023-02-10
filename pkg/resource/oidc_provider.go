@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -50,4 +51,30 @@ func (c *ResourceClient) CreateOIDCProvider(
 	oidcProviderARN = *resp.OpenIDConnectProviderArn
 
 	return oidcProviderARN, nil
+}
+
+// DeleteOIDCProvider deletes an OIDC identity cluster in IAM.  If  an empty ARN
+// is provided or if not found it returns without error.
+func (c *ResourceClient) DeleteOIDCProvider(oidcProviderARN string) error {
+	svc := iam.NewFromConfig(c.AWSConfig)
+
+	// if clusterName is empty, there's nothing to delete
+	if oidcProviderARN == "" {
+		return nil
+	}
+
+	deleteOIDCProviderInput := iam.DeleteOpenIDConnectProviderInput{
+		OpenIDConnectProviderArn: &oidcProviderARN,
+	}
+	_, err := svc.DeleteOpenIDConnectProvider(c.Context, &deleteOIDCProviderInput)
+	if err != nil {
+		var noSuchEntityErr *types.NoSuchEntityException
+		if errors.As(err, &noSuchEntityErr) {
+			return nil
+		} else {
+			return fmt.Errorf("failed to delete IAM identity provider %s: %w", oidcProviderARN, err)
+		}
+	}
+
+	return nil
 }

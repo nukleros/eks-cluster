@@ -26,6 +26,7 @@ func (c *ResourceClient) CreateNodeGroups(
 	nodeRoleARN string,
 	privateSubnetIDs []string,
 	instanceTypes []string,
+	maxNodes int32,
 	keyPair string,
 ) (*[]types.Nodegroup, error) {
 	svc := eks.NewFromConfig(c.AWSConfig)
@@ -48,6 +49,9 @@ func (c *ResourceClient) CreateNodeGroups(
 			Version:       &kubernetesVersion,
 			RemoteAccess:  &remoteAccessConfig,
 			Tags:          *tags,
+			ScalingConfig: &types.NodegroupScalingConfig{
+				MaxSize: &maxNodes,
+			},
 		}
 	} else {
 		createPrivateNodeGroupInput = eks.CreateNodegroupInput{
