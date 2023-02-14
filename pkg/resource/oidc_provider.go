@@ -41,6 +41,7 @@ func (c *ResourceClient) CreateOIDCProvider(
 	}
 
 	createOIDCProviderInput := iam.CreateOpenIDConnectProviderInput{
+		ClientIDList:   []string{"sts.amazonaws.com"},
 		ThumbprintList: []string{thumbprintString},
 		Url:            &providerURL,
 	}

@@ -3,6 +3,7 @@ package resource
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
@@ -110,6 +111,7 @@ func (c *ResourceClient) CreateDNSManagementRole(
 ) (*types.Role, error) {
 	svc := iam.NewFromConfig(c.AWSConfig)
 
+	oidcProviderBare := strings.Trim(oidcProvider, "https://")
 	dnsManagementRoleName := DNSManagementRoleName
 	dnsManagementRolePolicyDocument := fmt.Sprintf(`{
     "Version": "2012-10-17",
@@ -128,7 +130,7 @@ func (c *ResourceClient) CreateDNSManagementRole(
             }
         }
     ]
-}`, awsAccountID, oidcProvider, serviceAccount.Namespace, serviceAccount.Name)
+}`, awsAccountID, oidcProviderBare, serviceAccount.Namespace, serviceAccount.Name)
 	createDNSManagementRoleInput := iam.CreateRoleInput{
 		AssumeRolePolicyDocument: &dnsManagementRolePolicyDocument,
 		RoleName:                 &dnsManagementRoleName,
