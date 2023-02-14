@@ -26,7 +26,7 @@ func (c *ResourceClient) CreateCluster(
 	roleARN string,
 	subnetIDs []string,
 ) (*types.Cluster, error) {
-	svc := eks.NewFromConfig(c.AWSConfig)
+	svc := eks.NewFromConfig(*c.AWSConfig)
 
 	privateAccess := true
 	publicAccess := true
@@ -54,12 +54,12 @@ func (c *ResourceClient) CreateCluster(
 // DeleteCluster deletes an EKS cluster.  If  an empty cluster name is supplied,
 // or if the cluster is not found it returns without error.
 func (c *ResourceClient) DeleteCluster(clusterName string) error {
-	svc := eks.NewFromConfig(c.AWSConfig)
-
 	// if clusterName is empty, there's nothing to delete
 	if clusterName == "" {
 		return nil
 	}
+
+	svc := eks.NewFromConfig(*c.AWSConfig)
 
 	deleteClusterInput := eks.DeleteClusterInput{Name: &clusterName}
 	_, err := svc.DeleteCluster(c.Context, &deleteClusterInput)
@@ -120,7 +120,7 @@ func (c *ResourceClient) WaitForCluster(
 
 // getCluster retrieves the cluster for a given cluster name.
 func (c *ResourceClient) getCluster(clusterName string) (*types.Cluster, error) {
-	svc := eks.NewFromConfig(c.AWSConfig)
+	svc := eks.NewFromConfig(*c.AWSConfig)
 
 	describeClusterInput := eks.DescribeClusterInput{
 		Name: &clusterName,

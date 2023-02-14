@@ -21,7 +21,7 @@ const (
 
 // CreateRoles creates the IAM roles needed for EKS clusters and node groups.
 func (c *ResourceClient) CreateRoles(tags *[]types.Tag) (*types.Role, *types.Role, error) {
-	svc := iam.NewFromConfig(c.AWSConfig)
+	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	clusterRoleName := ClusterRoleName
 	clusterPolicyARN := ClusterPolicyARN
@@ -109,7 +109,7 @@ func (c *ResourceClient) CreateDNSManagementRole(
 	oidcProvider string,
 	serviceAccount *DNSManagementServiceAccount,
 ) (*types.Role, error) {
-	svc := iam.NewFromConfig(c.AWSConfig)
+	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
 	dnsManagementRoleName := DNSManagementRoleName
@@ -158,12 +158,12 @@ func (c *ResourceClient) CreateDNSManagementRole(
 // provided, or if the roles are not found it returns without error.
 // func (c *ResourceClient) DeleteRoles(clusterRole, workerRole *RoleInventory) error {
 func (c *ResourceClient) DeleteRoles(roles *[]RoleInventory) error {
-	svc := iam.NewFromConfig(c.AWSConfig)
-
 	// if roles are empty, there's nothing to delete
 	if len(*roles) == 0 {
 		return nil
 	}
+
+	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	for _, role := range *roles {
 

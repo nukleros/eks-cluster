@@ -19,7 +19,7 @@ func (c *ResourceClient) CreateOIDCProvider(
 	tags *[]types.Tag,
 	providerURL string,
 ) (string, error) {
-	svc := iam.NewFromConfig(c.AWSConfig)
+	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	var oidcProviderARN string
 	// get the OIDC provider server certificate thumbprint
@@ -57,12 +57,12 @@ func (c *ResourceClient) CreateOIDCProvider(
 // DeleteOIDCProvider deletes an OIDC identity cluster in IAM.  If  an empty ARN
 // is provided or if not found it returns without error.
 func (c *ResourceClient) DeleteOIDCProvider(oidcProviderARN string) error {
-	svc := iam.NewFromConfig(c.AWSConfig)
-
 	// if clusterName is empty, there's nothing to delete
 	if oidcProviderARN == "" {
 		return nil
 	}
+
+	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	deleteOIDCProviderInput := iam.DeleteOpenIDConnectProviderInput{
 		OpenIDConnectProviderArn: &oidcProviderARN,

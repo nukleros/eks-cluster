@@ -31,7 +31,7 @@ func (c *ResourceClient) CreateNodeGroups(
 	maxNodes int32,
 	keyPair string,
 ) (*[]types.Nodegroup, error) {
-	svc := eks.NewFromConfig(c.AWSConfig)
+	svc := eks.NewFromConfig(*c.AWSConfig)
 
 	var nodeGroups []types.Nodegroup
 
@@ -81,12 +81,12 @@ func (c *ResourceClient) CreateNodeGroups(
 // name or node group name is supplied, or if it does not find a node group
 // matching the given name it returns without error.
 func (c *ResourceClient) DeleteNodeGroups(clusterName string, nodeGroupNames []string) error {
-	svc := eks.NewFromConfig(c.AWSConfig)
-
 	// if clusterName or nodeGroupName are empty, there's nothing to delete
 	if clusterName == "" || len(nodeGroupNames) == 0 {
 		return nil
 	}
+
+	svc := eks.NewFromConfig(*c.AWSConfig)
 
 	for _, nodeGroupName := range nodeGroupNames {
 		deleteNodeGroupInput := eks.DeleteNodegroupInput{
@@ -161,7 +161,7 @@ func (c *ResourceClient) WaitForNodeGroups(
 
 // getNodeGroupStatus retrieves the status of a node group.
 func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (*types.NodegroupStatus, error) {
-	svc := eks.NewFromConfig(c.AWSConfig)
+	svc := eks.NewFromConfig(*c.AWSConfig)
 
 	describeNodeGroupInput := eks.DescribeNodegroupInput{
 		ClusterName:   &clusterName,

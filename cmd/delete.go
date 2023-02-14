@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/nukleros/eks-cluster/pkg/resource"
 	"github.com/spf13/cobra"
 )
@@ -33,18 +32,15 @@ var deleteCmd = &cobra.Command{
 		}
 
 		// create resource client
+		awsConfig, err := resource.LoadAWSConfig(
+			awsConfigEnv, awsConfigProfile, awsRegion)
+		if err != nil {
+			return err
+		}
 		msgChan := make(chan string)
 		go outputMessages(&msgChan)
 		ctx := context.Background()
-		cfg, err := config.LoadDefaultConfig(
-			ctx,
-			//config.WithRegion(r.Region),
-		)
-		resourceClient := resource.ResourceClient{
-			&msgChan,
-			ctx,
-			cfg,
-		}
+		resourceClient := resource.ResourceClient{&msgChan, ctx, awsConfig}
 
 		// delete resources
 		fmt.Println("Deleting resources for EKS cluster...")

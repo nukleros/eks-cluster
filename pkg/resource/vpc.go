@@ -16,7 +16,7 @@ func (c *ResourceClient) CreateVPC(
 	cidrBlock string,
 	clusterName string,
 ) (*types.Vpc, error) {
-	svc := ec2.NewFromConfig(c.AWSConfig)
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	clusterNameTagKey := "kubernetes.io/cluster/cluster-name"
 	clusterNameTagValue := clusterName
@@ -75,12 +75,12 @@ func (c *ResourceClient) CreateVPC(
 // DeleteVPC deletes the VPC used by an EKS cluster.  If the VPC ID is empty, or
 // if the VPC is not found it returns without error.
 func (c *ResourceClient) DeleteVPC(vpcID string) error {
-	svc := ec2.NewFromConfig(c.AWSConfig)
-
 	// if both vpcID is empty, there's nothing to delete
 	if vpcID == "" {
 		return nil
 	}
+
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	deleteVPCInput := ec2.DeleteVpcInput{VpcId: &vpcID}
 	_, err := svc.DeleteVpc(c.Context, &deleteVPCInput)

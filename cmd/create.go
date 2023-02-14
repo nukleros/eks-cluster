@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -40,18 +39,15 @@ var createCmd = &cobra.Command{
 		}
 
 		// create resource client
+		awsConfig, err := resource.LoadAWSConfig(
+			awsConfigEnv, awsConfigProfile, awsRegion)
+		if err != nil {
+			return err
+		}
 		msgChan := make(chan string)
 		go outputMessages(&msgChan)
 		ctx := context.Background()
-		cfg, err := config.LoadDefaultConfig(
-			ctx,
-			//config.WithRegion(r.Region),
-		)
-		resourceClient := resource.ResourceClient{
-			&msgChan,
-			ctx,
-			cfg,
-		}
+		resourceClient := resource.ResourceClient{&msgChan, ctx, awsConfig}
 
 		// create resources
 		fmt.Println("Creating resources for EKS cluster...")

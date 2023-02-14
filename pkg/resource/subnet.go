@@ -19,7 +19,7 @@ func (c *ResourceClient) CreateSubnets(
 	clusterName string,
 	availabilityZones *[]AvailabilityZone,
 ) (*[]types.Subnet, *[]types.Subnet, error) {
-	svc := ec2.NewFromConfig(c.AWSConfig)
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	var privateSubnets []types.Subnet
 	var publicSubnets []types.Subnet
@@ -97,12 +97,12 @@ func (c *ResourceClient) CreateSubnets(
 // DeleteSubnets deletes the subnets used by the EKS cluster.  If no subnet IDs
 // are supplied, or if the subnets are not found it returns without error.
 func (c *ResourceClient) DeleteSubnets(subnetIDs []string) error {
-	svc := ec2.NewFromConfig(c.AWSConfig)
-
 	// if there are no subnet IDs there is nothing to do
 	if len(subnetIDs) == 0 {
 		return nil
 	}
+
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	for _, id := range subnetIDs {
 		deleteSubnetInput := ec2.DeleteSubnetInput{SubnetId: &id}

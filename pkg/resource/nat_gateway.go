@@ -26,7 +26,7 @@ func (c *ResourceClient) CreateNATGateways(
 	availabilityZones []AvailabilityZone,
 	elasticIPIDs []string,
 ) error {
-	svc := ec2.NewFromConfig(c.AWSConfig)
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	for i, az := range availabilityZones {
 		eip := elasticIPIDs[i]
@@ -54,12 +54,12 @@ func (c *ResourceClient) CreateNATGateways(
 // cluster was provisioned.  If an empty VPC ID is supplied, or if there are no
 // NAT gateways found in the VPC it returns without error.
 func (c *ResourceClient) DeleteNATGateways(vpcID string) error {
-	svc := ec2.NewFromConfig(c.AWSConfig)
-
 	// if no VPC ID, there's nothing to delete
 	if vpcID == "" {
 		return nil
 	}
+
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	_, natGatewayIDs, err := c.getNATGatewayStatuses(vpcID, nil)
 	if err != nil {
@@ -148,7 +148,7 @@ func (c *ResourceClient) getNATGatewayStatuses(
 	vpcID string,
 	availabilityZones *[]AvailabilityZone,
 ) (*[]types.NatGatewayState, map[string]string, error) {
-	svc := ec2.NewFromConfig(c.AWSConfig)
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	var natGatewayStates []types.NatGatewayState
 	subnetMap := make(map[string]string)

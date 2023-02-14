@@ -16,7 +16,7 @@ func (c *ResourceClient) CreateInternetGateway(
 	vpcID string,
 	clusterName string,
 ) (*types.InternetGateway, error) {
-	svc := ec2.NewFromConfig(c.AWSConfig)
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	createIGWInput := ec2.CreateInternetGatewayInput{
 		TagSpecifications: []types.TagSpecification{
@@ -48,12 +48,12 @@ func (c *ResourceClient) CreateInternetGateway(
 // DeleteInternetGateway deletes an internet gateway.  If an empty ID is
 // supplied, or if the internet gateway is not found, it returns without error.
 func (c *ResourceClient) DeleteInternetGateway(internetGatewayID, vpcID string) error {
-	svc := ec2.NewFromConfig(c.AWSConfig)
-
 	// if internetGatewayID is empty, there's nothing to delete
 	if internetGatewayID == "" {
 		return nil
 	}
+
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	detachInternetGatewayInput := ec2.DetachInternetGatewayInput{
 		InternetGatewayId: &internetGatewayID,

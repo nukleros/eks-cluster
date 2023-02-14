@@ -19,7 +19,7 @@ func (c *ResourceClient) CreateRouteTables(
 	internetGatewayID string,
 	availabilityZones *[]AvailabilityZone,
 ) (*[]types.RouteTable, *types.RouteTable, error) {
-	svc := ec2.NewFromConfig(c.AWSConfig)
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	destinationCIDR := "0.0.0.0/0"
 
@@ -118,7 +118,7 @@ func (c *ResourceClient) CreateRouteTables(
 // DeleteRouteTables deletes the route tables for the public and private subnets
 // that are used by EKS.
 func (c *ResourceClient) DeleteRouteTables(privateRouteTableIDs []string, publicRouteTable string) error {
-	svc := ec2.NewFromConfig(c.AWSConfig)
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	var allRouteTableIDs []string
 	switch {

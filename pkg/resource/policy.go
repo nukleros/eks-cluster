@@ -11,7 +11,7 @@ import (
 // CreatePolicy creates the IAM policy to be used for managing Route53 DNS
 // records.
 func (c *ResourceClient) CreatePolicy(tags *[]types.Tag) (*types.Policy, error) {
-	svc := iam.NewFromConfig(c.AWSConfig)
+	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	dnsPolicyName := "DNSUpdates"
 	dnsPolicyDescription := "Allow cluster services to update Route53 records"
@@ -55,12 +55,12 @@ func (c *ResourceClient) CreatePolicy(tags *[]types.Tag) (*types.Policy, error) 
 // DeletePolicy deletes the DNS management IAM policy.  If the policy is not
 // found it returns without error.
 func (c *ResourceClient) DeletePolicy(policyARN string) error {
-	svc := iam.NewFromConfig(c.AWSConfig)
-
 	// if roleARN is empty, there's nothing to delete
 	if policyARN == "" {
 		return nil
 	}
+
+	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	deletePolicyInput := iam.DeletePolicyInput{
 		PolicyArn: &policyARN,

@@ -14,7 +14,7 @@ func (c *ResourceClient) CreateElasticIPs(
 	tags *[]types.Tag,
 	publicSubnetIDs []string,
 ) ([]string, error) {
-	svc := ec2.NewFromConfig(c.AWSConfig)
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	var elasticIPIDs []string
 
@@ -41,12 +41,12 @@ func (c *ResourceClient) CreateElasticIPs(
 // DeleteElasticIPs releases elastic IP addresses.  If no IDs are supplied, or
 // if the address IDs are not found it exits without error.
 func (c *ResourceClient) DeleteElasticIPs(elasticIPIDs []string) error {
-	svc := ec2.NewFromConfig(c.AWSConfig)
-
 	// if elasticIPIDs are empty, there's nothing to delete
 	if len(elasticIPIDs) == 0 {
 		return nil
 	}
+
+	svc := ec2.NewFromConfig(*c.AWSConfig)
 
 	for _, elasticIPID := range elasticIPIDs {
 		deleteElasticIPInput := ec2.ReleaseAddressInput{AllocationId: &elasticIPID}
