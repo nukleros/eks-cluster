@@ -12,10 +12,11 @@ import (
 type NodeGroupCondition string
 
 const (
-	NodeGroupConditionCreated = "NodeGroupCreated"
-	NodeGroupConditionDeleted = "NodeGroupDeleted"
-	NodeGroupCheckInterval    = 15 //check cluster status every 15 seconds
-	NodeGroupCheckMaxCount    = 60 // check 60 times before giving up (15 minutes)
+	NodeGroupConditionCreated       = "NodeGroupCreated"
+	NodeGroupConditionDeleted       = "NodeGroupDeleted"
+	NodeGroupCheckInterval          = 15 //check cluster status every 15 seconds
+	NodeGroupCheckMaxCount          = 60 // check 60 times before giving up (15 minutes)
+	NodeGroupInitialSize      int32 = 2
 )
 
 // CreateNodeGroups creates a private node group for an EKS cluster.
@@ -26,6 +27,7 @@ func (c *ResourceClient) CreateNodeGroups(
 	nodeRoleARN string,
 	privateSubnetIDs []string,
 	instanceTypes []string,
+	minNodes int32,
 	maxNodes int32,
 	keyPair string,
 ) (*[]types.Nodegroup, error) {
@@ -34,7 +36,7 @@ func (c *ResourceClient) CreateNodeGroups(
 	var nodeGroups []types.Nodegroup
 
 	privateNodeGroupName := fmt.Sprintf("%s-private-node-group", clusterName)
-
+	nodeGroupInitialSize := NodeGroupInitialSize
 	var createPrivateNodeGroupInput eks.CreateNodegroupInput
 	if keyPair != "" {
 		remoteAccessConfig := types.RemoteAccessConfig{
@@ -50,7 +52,9 @@ func (c *ResourceClient) CreateNodeGroups(
 			RemoteAccess:  &remoteAccessConfig,
 			Tags:          *tags,
 			ScalingConfig: &types.NodegroupScalingConfig{
-				MaxSize: &maxNodes,
+				DesiredSize: &nodeGroupInitialSize,
+				MaxSize:     &maxNodes,
+				MinSize:     &minNodes,
 			},
 		}
 	} else {

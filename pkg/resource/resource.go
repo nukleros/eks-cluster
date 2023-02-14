@@ -25,6 +25,7 @@ type ResourceConfig struct {
 	ClusterCIDR                 string                      `yaml:"clusterCIDR"`
 	AvailabilityZones           []AvailabilityZone          `yaml:"availabilityZones"`
 	InstanceTypes               []string                    `yaml:"instanceTypes"`
+	MinNodes                    int32                       `yaml:"minNodes"`
 	MaxNodes                    int32                       `yaml:"maxNodes"`
 	DNSManagement               bool                        `yaml:"dnsManagement"`
 	DNSManagementServiceAccount DNSManagementServiceAccount `yaml:"dnsManagementServiceAccount"`
@@ -74,6 +75,8 @@ func NewResourceConfig() *ResourceConfig {
 			},
 		},
 		InstanceTypes: []string{"t2.micro"},
+		MinNodes:      int32(2),
+		MaxNodes:      int32(4),
 	}
 }
 
@@ -285,7 +288,7 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 	// Node Groups
 	var nodeGroupNames []string
 	nodeGroups, err := c.CreateNodeGroups(&mapTags, *cluster.Name, r.KubernetesVersion,
-		*workerRole.Arn, privateSubnetIDs, r.InstanceTypes, r.MaxNodes, r.KeyPair)
+		*workerRole.Arn, privateSubnetIDs, r.InstanceTypes, r.MinNodes, r.MaxNodes, r.KeyPair)
 	if nodeGroups != nil {
 		for _, nodeGroup := range *nodeGroups {
 			nodeGroupNames = append(nodeGroupNames, *nodeGroup.NodegroupName)

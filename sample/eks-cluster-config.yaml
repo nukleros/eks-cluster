@@ -3,6 +3,7 @@ region: "us-east-2"
 awsAccountID: "575822346426"
 instanceTypes:
   - "t3.micro"
+minNodes: 1
 maxNodes: 6
 dnsManagement: true
 dnsManagementServiceAccount:
