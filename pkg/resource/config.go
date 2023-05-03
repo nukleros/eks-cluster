@@ -8,6 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 )
 
+const DefaultKubernetesVersion = "1.25"
+
 // ResourceConfig contains the configuration options for an EKS cluster.
 type ResourceConfig struct {
 	Name                        string                      `yaml:"name"`
@@ -48,7 +50,7 @@ type DNSManagementServiceAccount struct {
 func NewResourceConfig() *ResourceConfig {
 	return &ResourceConfig{
 		Name:              "eks-cluster",
-		KubernetesVersion: "1.24",
+		KubernetesVersion: DefaultKubernetesVersion,
 		Region:            "us-east-2",
 		ClusterCIDR:       "10.0.0.0/16",
 		AvailabilityZones: []AvailabilityZone{
