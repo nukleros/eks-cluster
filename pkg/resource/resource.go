@@ -19,16 +19,16 @@ type ResourceClient struct {
 var ErrResourceNotFound = errors.New("resource not found")
 
 // CreateResourceStack creates all the resources for an EKS cluster.
-func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInventory, error) {
-	inventory := ResourceInventory{Region: r.Region}
+func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*ResourceInventory, error) {
+	inventory := ResourceInventory{Region: resourceConfig.Region}
 
 	// Tags
-	ec2Tags := CreateEC2Tags(r.Name, r.Tags)
-	iamTags := CreateIAMTags(r.Name, r.Tags)
-	mapTags := CreateMapTags(r.Name, r.Tags)
+	ec2Tags := CreateEC2Tags(resourceConfig.Name, resourceConfig.Tags)
+	iamTags := CreateIAMTags(resourceConfig.Name, resourceConfig.Tags)
+	mapTags := CreateMapTags(resourceConfig.Name, resourceConfig.Tags)
 
 	// VPC
-	vpc, err := c.CreateVPC(ec2Tags, r.ClusterCIDR, r.Name)
+	vpc, err := c.CreateVPC(ec2Tags, resourceConfig.ClusterCIDR, resourceConfig.Name)
 	if vpc != nil {
 		inventory.VPCID = *vpc.VpcId
 	}
@@ -40,7 +40,7 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 	}
 
 	// Internet Gateway
-	igw, err := c.CreateInternetGateway(ec2Tags, *vpc.VpcId, r.Name)
+	igw, err := c.CreateInternetGateway(ec2Tags, *vpc.VpcId, resourceConfig.Name)
 	if igw != nil {
 		inventory.InternetGatewayID = *igw.InternetGatewayId
 	}
@@ -55,7 +55,7 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 	var privateSubnetIDs []string
 	var publicSubnetIDs []string
 	var allSubnetIDs []string
-	privateSubnets, publicSubnets, err := c.CreateSubnets(ec2Tags, *vpc.VpcId, r.Name, &r.AvailabilityZones)
+	privateSubnets, publicSubnets, err := c.CreateSubnets(ec2Tags, *vpc.VpcId, resourceConfig.Name, &resourceConfig.AvailabilityZones)
 	if privateSubnets != nil {
 		for _, subnet := range *privateSubnets {
 			privateSubnetIDs = append(privateSubnetIDs, *subnet.SubnetId)
@@ -90,14 +90,14 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 	// Note: unlike all other resources, the resource ID is not returned on
 	// creation.  The IDs are not added to the inventory.  Instead, the NAT
 	// gateways are cleaned up by filtering by VPC ID.
-	if err := c.CreateNATGateways(ec2Tags, r.AvailabilityZones, elasticIPIDs); err != nil {
+	if err := c.CreateNATGateways(ec2Tags, resourceConfig.AvailabilityZones, elasticIPIDs); err != nil {
 		return &inventory, err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("NAT gateways created for subnets: %s\n", privateSubnetIDs)
 		*c.MessageChan <- fmt.Sprintf("Waiting for NAT gateways to become active for subnets: %s\n", privateSubnetIDs)
 	}
-	if err := c.WaitForNATGateways(*vpc.VpcId, &r.AvailabilityZones, NATGatewayConditionCreated); err != nil {
+	if err := c.WaitForNATGateways(*vpc.VpcId, &resourceConfig.AvailabilityZones, NATGatewayConditionCreated); err != nil {
 		return &inventory, err
 	}
 	if c.MessageChan != nil {
@@ -107,7 +107,7 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 	// Route Tables
 	var privateRouteTableIDs []string
 	privateRouteTables, publicRouteTable, err := c.CreateRouteTables(ec2Tags,
-		*vpc.VpcId, *igw.InternetGatewayId, &r.AvailabilityZones)
+		*vpc.VpcId, *igw.InternetGatewayId, &resourceConfig.AvailabilityZones)
 	if privateRouteTables != nil {
 		for _, rt := range *privateRouteTables {
 			privateRouteTableIDs = append(privateRouteTableIDs, *rt.RouteTableId)
@@ -127,7 +127,7 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 	}
 
 	// IAM Policy for DNS management
-	if r.DNSManagement {
+	if resourceConfig.DNSManagement {
 		dnsPolicy, err := c.CreatePolicy(iamTags)
 		if dnsPolicy != nil {
 			inventory.DNSManagementPolicyARN = *dnsPolicy.Arn
@@ -164,7 +164,7 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 	}
 
 	// EKS Cluster
-	cluster, err := c.CreateCluster(&mapTags, r.Name, r.KubernetesVersion,
+	cluster, err := c.CreateCluster(&mapTags, resourceConfig.Name, resourceConfig.KubernetesVersion,
 		*clusterRole.Arn, privateSubnetIDs)
 	if cluster != nil {
 		inventory.Cluster.ClusterName = *cluster.Name
@@ -190,8 +190,8 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 
 	// Node Groups
 	var nodeGroupNames []string
-	nodeGroups, err := c.CreateNodeGroups(&mapTags, *cluster.Name, r.KubernetesVersion,
-		*workerRole.Arn, privateSubnetIDs, r.InstanceTypes, r.MinNodes, r.MaxNodes, r.KeyPair)
+	nodeGroups, err := c.CreateNodeGroups(&mapTags, *cluster.Name, resourceConfig.KubernetesVersion,
+		*workerRole.Arn, privateSubnetIDs, resourceConfig.InstanceTypes, resourceConfig.MinNodes, resourceConfig.MaxNodes, resourceConfig.KeyPair)
 	if nodeGroups != nil {
 		for _, nodeGroup := range *nodeGroups {
 			nodeGroupNames = append(nodeGroupNames, *nodeGroup.NodegroupName)
@@ -229,12 +229,12 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 	}
 
 	// IAM Role for DNS Management
-	if r.DNSManagement {
+	if resourceConfig.DNSManagement {
 		if inventory.DNSManagementPolicyARN == "" {
 			return &inventory, errors.New("no DNS policy ARN to attach to DNS management role")
 		}
 		dnsManagementRole, err := c.CreateDNSManagementRole(iamTags, inventory.DNSManagementPolicyARN,
-			r.AWSAccountID, oidcIssuer, &r.DNSManagementServiceAccount)
+			resourceConfig.AWSAccountID, oidcIssuer, &resourceConfig.DNSManagementServiceAccount)
 		if dnsManagementRole != nil {
 			inventory.DNSManagementRole = RoleInventory{
 				RoleName:       *dnsManagementRole.RoleName,
@@ -251,120 +251,119 @@ func (c *ResourceClient) CreateResourceStack(r *ResourceConfig) (*ResourceInvent
 }
 
 // DeleteResourceStack deletes all the resources in the resource inventory.
-func (c *ResourceClient) DeleteResourceStack(r *ResourceInventory) error {
+func (c *ResourceClient) DeleteResourceStack(resourceInv *ResourceInventory) error {
 	// OIDC Provider
-	if err := c.DeleteOIDCProvider(r.OIDCProviderARN); err != nil {
+	if err := c.DeleteOIDCProvider(resourceInv.OIDCProviderARN); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("OIDC provider deleted: %s\n", r.OIDCProviderARN)
+		*c.MessageChan <- fmt.Sprintf("OIDC provider deleted: %s\n", resourceInv.OIDCProviderARN)
 	}
 
 	// Node Groups
-	if err := c.DeleteNodeGroups(r.Cluster.ClusterName, r.NodeGroupNames); err != nil {
+	if err := c.DeleteNodeGroups(resourceInv.Cluster.ClusterName, resourceInv.NodeGroupNames); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("Node groups deletion initiated: %s\n", r.NodeGroupNames)
-		*c.MessageChan <- fmt.Sprintf("Waiting for node groups to be deleted: %s\n", r.NodeGroupNames)
+		*c.MessageChan <- fmt.Sprintf("Node groups deletion initiated: %s\n", resourceInv.NodeGroupNames)
+		*c.MessageChan <- fmt.Sprintf("Waiting for node groups to be deleted: %s\n", resourceInv.NodeGroupNames)
 	}
-	if err := c.WaitForNodeGroups(r.Cluster.ClusterName, r.NodeGroupNames, NodeGroupConditionDeleted); err != nil {
+	if err := c.WaitForNodeGroups(resourceInv.Cluster.ClusterName, resourceInv.NodeGroupNames, NodeGroupConditionDeleted); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("Node groups deletion complete: %s\n", r.NodeGroupNames)
+		*c.MessageChan <- fmt.Sprintf("Node groups deletion complete: %s\n", resourceInv.NodeGroupNames)
 	}
 
 	// EKS Cluster
-	if err := c.DeleteCluster(r.Cluster.ClusterName); err != nil {
+	if err := c.DeleteCluster(resourceInv.Cluster.ClusterName); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion initiated: %s\n", r.Cluster.ClusterName)
-		*c.MessageChan <- fmt.Sprintf("Waiting for EKS cluster to be deleted: %s\n", r.Cluster.ClusterName)
+		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion initiated: %s\n", resourceInv.Cluster.ClusterName)
+		*c.MessageChan <- fmt.Sprintf("Waiting for EKS cluster to be deleted: %s\n", resourceInv.Cluster.ClusterName)
 	}
-	if _, err := c.WaitForCluster(r.Cluster.ClusterName, ClusterConditionDeleted); err != nil {
+	if _, err := c.WaitForCluster(resourceInv.Cluster.ClusterName, ClusterConditionDeleted); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion complete: %s\n", r.Cluster.ClusterName)
+		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion complete: %s\n", resourceInv.Cluster.ClusterName)
 	}
 
 	// IAM Roles
-	iamRoles := []RoleInventory{r.ClusterRole, r.WorkerRole, r.DNSManagementRole}
-	//if err := c.DeleteRoles(&r.ClusterRole, &r.WorkerRole); err != nil {
+	iamRoles := []RoleInventory{resourceInv.ClusterRole, resourceInv.WorkerRole, resourceInv.DNSManagementRole}
 	if err := c.DeleteRoles(&iamRoles); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("IAM roles deleted: [%s %s]\n", &r.ClusterRole, &r.WorkerRole)
+		*c.MessageChan <- fmt.Sprintf("IAM roles deleted: [%s %s]\n", &resourceInv.ClusterRole, &resourceInv.WorkerRole)
 	}
 
 	// IAM Policy
-	if err := c.DeletePolicy(r.DNSManagementPolicyARN); err != nil {
+	if err := c.DeletePolicy(resourceInv.DNSManagementPolicyARN); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("IAM policy deleted: %s\n", r.DNSManagementPolicyARN)
+		*c.MessageChan <- fmt.Sprintf("IAM policy deleted: %s\n", resourceInv.DNSManagementPolicyARN)
 	}
 
 	// NAT Gateways
-	if err := c.DeleteNATGateways(r.VPCID); err != nil {
+	if err := c.DeleteNATGateways(resourceInv.VPCID); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("NAT gateways deleted for VPC with ID: %s\n", r.VPCID)
+		*c.MessageChan <- fmt.Sprintf("NAT gateways deleted for VPC with ID: %s\n", resourceInv.VPCID)
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("NAT gateways deletion initiated for VPC with ID: %s\n", r.VPCID)
-		*c.MessageChan <- fmt.Sprintf("Waiting for NAT gateways to be deleted for VPC with ID: %s\n", r.VPCID)
+		*c.MessageChan <- fmt.Sprintf("NAT gateways deletion initiated for VPC with ID: %s\n", resourceInv.VPCID)
+		*c.MessageChan <- fmt.Sprintf("Waiting for NAT gateways to be deleted for VPC with ID: %s\n", resourceInv.VPCID)
 	}
-	if err := c.WaitForNATGateways(r.VPCID, nil, NATGatewayConditionDeleted); err != nil {
+	if err := c.WaitForNATGateways(resourceInv.VPCID, nil, NATGatewayConditionDeleted); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("NAT gateway deletion complete for VPC with ID: %s\n", r.VPCID)
+		*c.MessageChan <- fmt.Sprintf("NAT gateway deletion complete for VPC with ID: %s\n", resourceInv.VPCID)
 	}
 
 	// Internet Gateway
-	if err := c.DeleteInternetGateway(r.InternetGatewayID, r.VPCID); err != nil {
+	if err := c.DeleteInternetGateway(resourceInv.InternetGatewayID, resourceInv.VPCID); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("Internet gateway deleted: %s\n", r.InternetGatewayID)
+		*c.MessageChan <- fmt.Sprintf("Internet gateway deleted: %s\n", resourceInv.InternetGatewayID)
 	}
 
 	// Elastic IPs
-	if err := c.DeleteElasticIPs(r.ElasticIPIDs); err != nil {
+	if err := c.DeleteElasticIPs(resourceInv.ElasticIPIDs); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("Elastic IPs deleted: %s\n", r.ElasticIPIDs)
+		*c.MessageChan <- fmt.Sprintf("Elastic IPs deleted: %s\n", resourceInv.ElasticIPIDs)
 	}
 
 	// Subnets
-	if err := c.DeleteSubnets(r.SubnetIDs); err != nil {
+	if err := c.DeleteSubnets(resourceInv.SubnetIDs); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("Subnets deleted: %s\n", r.SubnetIDs)
+		*c.MessageChan <- fmt.Sprintf("Subnets deleted: %s\n", resourceInv.SubnetIDs)
 	}
 
 	// Route Tables
-	if err := c.DeleteRouteTables(r.PrivateRouteTableIDs, r.PublicRouteTableID); err != nil {
+	if err := c.DeleteRouteTables(resourceInv.PrivateRouteTableIDs, resourceInv.PublicRouteTableID); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("Route tables deleted: [%s %s]\n",
-			r.PrivateRouteTableIDs, r.PublicRouteTableID)
+			resourceInv.PrivateRouteTableIDs, resourceInv.PublicRouteTableID)
 	}
 
 	// VPC
-	if err := c.DeleteVPC(r.VPCID); err != nil {
+	if err := c.DeleteVPC(resourceInv.VPCID); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("VPC deleted: %s\n", r.VPCID)
+		*c.MessageChan <- fmt.Sprintf("VPC deleted: %s\n", resourceInv.VPCID)
 	}
 
 	return nil
