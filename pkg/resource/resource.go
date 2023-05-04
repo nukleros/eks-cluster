@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 )
 
 // ResourceClient contains the elements needed to manage resources with this
@@ -127,10 +128,12 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 	}
 
 	// IAM Policy for DNS management
+	var createdDNSPolicy types.Policy
 	if resourceConfig.DNSManagement {
-		dnsPolicy, err := c.CreatePolicy(iamTags)
+		dnsPolicy, err := c.CreateDNSManagementPolicy(iamTags)
 		if dnsPolicy != nil {
-			inventory.DNSManagementPolicyARN = *dnsPolicy.Arn
+			//inventory.DNSManagementPolicyARN = *dnsPolicy.Arn
+			inventory.PolicyARNs = append(inventory.PolicyARNs, *dnsPolicy.Arn)
 		}
 		if err != nil {
 			return &inventory, err
@@ -138,6 +141,7 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 		if c.MessageChan != nil {
 			*c.MessageChan <- fmt.Sprintf("IAM policy created: %s\n", *dnsPolicy.PolicyName)
 		}
+		createdDNSPolicy = *dnsPolicy
 	}
 
 	// IAM Roles
@@ -230,21 +234,44 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 
 	// IAM Role for DNS Management
 	if resourceConfig.DNSManagement {
-		if inventory.DNSManagementPolicyARN == "" {
+		if createdDNSPolicy.Arn == nil {
 			return &inventory, errors.New("no DNS policy ARN to attach to DNS management role")
 		}
-		dnsManagementRole, err := c.CreateDNSManagementRole(iamTags, inventory.DNSManagementPolicyARN,
+		dnsManagementRole, err := c.CreateDNSManagementRole(iamTags, *createdDNSPolicy.Arn,
 			resourceConfig.AWSAccountID, oidcIssuer, &resourceConfig.DNSManagementServiceAccount)
 		if dnsManagementRole != nil {
 			inventory.DNSManagementRole = RoleInventory{
 				RoleName:       *dnsManagementRole.RoleName,
 				RoleARN:        *dnsManagementRole.Arn,
-				RolePolicyARNs: []string{inventory.DNSManagementPolicyARN},
+				RolePolicyARNs: []string{*createdDNSPolicy.Arn},
 			}
 		}
 		if err != nil {
 			return &inventory, err
 		}
+	}
+
+	// IAM Role for Storage Management
+	storageManagementRole, err := c.CreateStorageManagementRole(iamTags, resourceConfig.AWSAccountID,
+		oidcIssuer, &resourceConfig.StorageManagementServiceAccount)
+	if storageManagementRole != nil {
+		inventory.StorageManagementRole = RoleInventory{
+			RoleName:       *storageManagementRole.RoleName,
+			RoleARN:        *storageManagementRole.Arn,
+			RolePolicyARNs: []string{*storageManagementRole.PermissionsBoundary.PermissionsBoundaryArn},
+		}
+	}
+	if err != nil {
+		return &inventory, err
+	}
+
+	// EBS CSI Addon
+	ebsStorageAddon, err := c.CreateEBSStorageAddon(&mapTags, *cluster.Name, *storageManagementRole.Arn)
+	if err != nil {
+		return &inventory, err
+	}
+	if c.MessageChan != nil {
+		*c.MessageChan <- fmt.Sprintf("EBS storage addon created: %s\n", *ebsStorageAddon.AddonName)
 	}
 
 	return &inventory, nil
@@ -291,7 +318,7 @@ func (c *ResourceClient) DeleteResourceStack(resourceInv *ResourceInventory) err
 	}
 
 	// IAM Roles
-	iamRoles := []RoleInventory{resourceInv.ClusterRole, resourceInv.WorkerRole, resourceInv.DNSManagementRole}
+	iamRoles := []RoleInventory{resourceInv.ClusterRole, resourceInv.WorkerRole, resourceInv.DNSManagementRole, resourceInv.StorageManagementRole}
 	if err := c.DeleteRoles(&iamRoles); err != nil {
 		return err
 	}
@@ -299,12 +326,12 @@ func (c *ResourceClient) DeleteResourceStack(resourceInv *ResourceInventory) err
 		*c.MessageChan <- fmt.Sprintf("IAM roles deleted: [%s %s]\n", &resourceInv.ClusterRole, &resourceInv.WorkerRole)
 	}
 
-	// IAM Policy
-	if err := c.DeletePolicy(resourceInv.DNSManagementPolicyARN); err != nil {
+	// IAM Policies
+	if err := c.DeletePolicies(resourceInv.PolicyARNs); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("IAM policy deleted: %s\n", resourceInv.DNSManagementPolicyARN)
+		*c.MessageChan <- fmt.Sprintf("IAM policies deleted: %s\n", resourceInv.PolicyARNs)
 	}
 
 	// NAT Gateways

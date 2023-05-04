@@ -13,10 +13,12 @@ const (
 	ClusterRoleName            = "eks-cluster-role"
 	WorkerRoleName             = "eks-cluster-workler-role"
 	DNSManagementRoleName      = "eks-cluster-dns-management-role"
+	StorageManagementRoleName  = "eks-cluster-csi-driver-role"
 	ClusterPolicyARN           = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 	WorkerNodePolicyARN        = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
 	ContainerRegistryPolicyARN = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 	CNIPolicyARN               = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+	CSIDriverPolicyARN         = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 )
 
 // CreateRoles creates the IAM roles needed for EKS clusters and node groups.
@@ -154,9 +156,63 @@ func (c *ResourceClient) CreateDNSManagementRole(
 	return dnsManagementRoleResp.Role, nil
 }
 
+// CreateStorageManagementRole creates the IAM role needed for storage
+// management by the CSI driver's service account using IRSA (IAM role for
+// service accounts).
+func (c *ResourceClient) CreateStorageManagementRole(
+	tags *[]types.Tag,
+	awsAccountID string,
+	oidcProvider string,
+	serviceAccount *StorageManagementServiceAccount,
+) (*types.Role, error) {
+	svc := iam.NewFromConfig(*c.AWSConfig)
+
+	oidcProviderBare := strings.Trim(oidcProvider, "https://")
+	storageManagementRoleName := StorageManagementRoleName
+	storagePolicyARN := CSIDriverPolicyARN
+	storageManagementRolePolicyDocument := fmt.Sprintf(`{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": "arn:aws:iam::%[1]s:oidc-provider/%[2]s"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+                "StringEquals": {
+                    "%[2]s:sub": "system:serviceaccount:%[3]s:%[4]s",
+                    "%[2]s:aud": "sts.amazonaws.com"
+                }
+            }
+        }
+    ]
+}`, awsAccountID, oidcProviderBare, serviceAccount.Namespace, serviceAccount.Name)
+	createStorageManagementRoleInput := iam.CreateRoleInput{
+		AssumeRolePolicyDocument: &storageManagementRolePolicyDocument,
+		RoleName:                 &storageManagementRoleName,
+		PermissionsBoundary:      &storagePolicyARN,
+		Tags:                     *tags,
+	}
+	storageManagementRoleResp, err := svc.CreateRole(c.Context, &createStorageManagementRoleInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create role %s: %w", storageManagementRoleName, err)
+	}
+
+	attachStorageManagementRolePolicyInput := iam.AttachRolePolicyInput{
+		PolicyArn: &storagePolicyARN,
+		RoleName:  storageManagementRoleResp.Role.RoleName,
+	}
+	_, err = svc.AttachRolePolicy(c.Context, &attachStorageManagementRolePolicyInput)
+	if err != nil {
+		return storageManagementRoleResp.Role, fmt.Errorf("failed to attach role policy %s to %s: %w", storagePolicyARN, storageManagementRoleName, err)
+	}
+
+	return storageManagementRoleResp.Role, nil
+}
+
 // DeleteRoles deletes the IAM roles used by EKS.  If empty role names are
 // provided, or if the roles are not found it returns without error.
-// func (c *ResourceClient) DeleteRoles(clusterRole, workerRole *RoleInventory) error {
 func (c *ResourceClient) DeleteRoles(roles *[]RoleInventory) error {
 	// if roles are empty, there's nothing to delete
 	if len(*roles) == 0 {
@@ -166,7 +222,6 @@ func (c *ResourceClient) DeleteRoles(roles *[]RoleInventory) error {
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	for _, role := range *roles {
-
 		for _, policyARN := range role.RolePolicyARNs {
 			detachRolePolicyInput := iam.DetachRolePolicyInput{
 				PolicyArn: &policyARN,

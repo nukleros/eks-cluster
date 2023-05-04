@@ -8,9 +8,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 )
 
-// CreatePolicy creates the IAM policy to be used for managing Route53 DNS
-// records.
-func (c *ResourceClient) CreatePolicy(tags *[]types.Tag) (*types.Policy, error) {
+// CreateDNSManagementPolicy creates the IAM policy to be used for managing
+// Route53 DNS records.
+func (c *ResourceClient) CreateDNSManagementPolicy(tags *[]types.Tag) (*types.Policy, error) {
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	dnsPolicyName := "DNSUpdates"
@@ -52,26 +52,28 @@ func (c *ResourceClient) CreatePolicy(tags *[]types.Tag) (*types.Policy, error) 
 	return r53PolicyResp.Policy, nil
 }
 
-// DeletePolicy deletes the DNS management IAM policy.  If the policy is not
-// found it returns without error.
-func (c *ResourceClient) DeletePolicy(policyARN string) error {
+// DeletePolicies deletes the IAM policies.  If the policyARNs slice is empty it
+// returns without error.
+func (c *ResourceClient) DeletePolicies(policyARNs []string) error {
 	// if roleARN is empty, there's nothing to delete
-	if policyARN == "" {
+	if len(policyARNs) == 0 {
 		return nil
 	}
 
-	svc := iam.NewFromConfig(*c.AWSConfig)
+	for _, policyARN := range policyARNs {
+		svc := iam.NewFromConfig(*c.AWSConfig)
 
-	deletePolicyInput := iam.DeletePolicyInput{
-		PolicyArn: &policyARN,
-	}
-	_, err := svc.DeletePolicy(c.Context, &deletePolicyInput)
-	if err != nil {
-		var noSuchEntityErr *types.NoSuchEntityException
-		if errors.As(err, &noSuchEntityErr) {
-			return nil
-		} else {
-			return fmt.Errorf("failed to delete policy %s: %w", policyARN, err)
+		deletePolicyInput := iam.DeletePolicyInput{
+			PolicyArn: &policyARN,
+		}
+		_, err := svc.DeletePolicy(c.Context, &deletePolicyInput)
+		if err != nil {
+			var noSuchEntityErr *types.NoSuchEntityException
+			if errors.As(err, &noSuchEntityErr) {
+				continue
+			} else {
+				return fmt.Errorf("failed to delete policy %s: %w", policyARN, err)
+			}
 		}
 	}
 

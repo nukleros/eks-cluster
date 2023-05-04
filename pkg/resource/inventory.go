@@ -3,20 +3,21 @@ package resource
 // ResourceInventory contains a record of all resources created so they can be
 // referenced and cleaned up.
 type ResourceInventory struct {
-	Region                 string           `json:"region"`
-	VPCID                  string           `json:"vpcID"`
-	SubnetIDs              []string         `json:"subnetIDs"`
-	InternetGatewayID      string           `json:"internetGatewayID"`
-	ElasticIPIDs           []string         `json:"elasticIPIDs"`
-	PrivateRouteTableIDs   []string         `json:"privateRouteTableIDs"`
-	PublicRouteTableID     string           `json:"publicRouteTableID"`
-	ClusterRole            RoleInventory    `json:"clusterRole"`
-	WorkerRole             RoleInventory    `json:"workerRole"`
-	DNSManagementRole      RoleInventory    `json:"dnsManagementRole"`
-	DNSManagementPolicyARN string           `json:"dnsManagementPolicyARN"`
-	Cluster                ClusterInventory `json:"cluster"`
-	NodeGroupNames         []string         `json:"nodeGroupNames"`
-	OIDCProviderARN        string           `json:"oidcProviderARN"`
+	Region                string           `json:"region"`
+	VPCID                 string           `json:"vpcID"`
+	SubnetIDs             []string         `json:"subnetIDs"`
+	InternetGatewayID     string           `json:"internetGatewayID"`
+	ElasticIPIDs          []string         `json:"elasticIPIDs"`
+	PrivateRouteTableIDs  []string         `json:"privateRouteTableIDs"`
+	PublicRouteTableID    string           `json:"publicRouteTableID"`
+	ClusterRole           RoleInventory    `json:"clusterRole"`
+	WorkerRole            RoleInventory    `json:"workerRole"`
+	DNSManagementRole     RoleInventory    `json:"dnsManagementRole"`
+	PolicyARNs            []string         `json:"policyARNs"`
+	StorageManagementRole RoleInventory    `json:"storageManagementRole"`
+	Cluster               ClusterInventory `json:"cluster"`
+	NodeGroupNames        []string         `json:"nodeGroupNames"`
+	OIDCProviderARN       string           `json:"oidcProviderARN"`
 }
 
 // RoleInventory contains the details for each role created.

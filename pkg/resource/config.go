@@ -8,23 +8,24 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 )
 
-const DefaultKubernetesVersion = "1.25"
+const DefaultKubernetesVersion = "1.26"
 
 // ResourceConfig contains the configuration options for an EKS cluster.
 type ResourceConfig struct {
-	Name                        string                      `yaml:"name"`
-	Region                      string                      `yaml:"region"`
-	AWSAccountID                string                      `yaml:"awsAccountID"`
-	KubernetesVersion           string                      `yaml:"kubernetesVersion"`
-	ClusterCIDR                 string                      `yaml:"clusterCIDR"`
-	AvailabilityZones           []AvailabilityZone          `yaml:"availabilityZones"`
-	InstanceTypes               []string                    `yaml:"instanceTypes"`
-	MinNodes                    int32                       `yaml:"minNodes"`
-	MaxNodes                    int32                       `yaml:"maxNodes"`
-	DNSManagement               bool                        `yaml:"dnsManagement"`
-	DNSManagementServiceAccount DNSManagementServiceAccount `yaml:"dnsManagementServiceAccount"`
-	KeyPair                     string                      `yaml:"keyPair"`
-	Tags                        map[string]string           `yaml:"tags"`
+	Name                            string                          `yaml:"name"`
+	Region                          string                          `yaml:"region"`
+	AWSAccountID                    string                          `yaml:"awsAccountID"`
+	KubernetesVersion               string                          `yaml:"kubernetesVersion"`
+	ClusterCIDR                     string                          `yaml:"clusterCIDR"`
+	AvailabilityZones               []AvailabilityZone              `yaml:"availabilityZones"`
+	InstanceTypes                   []string                        `yaml:"instanceTypes"`
+	MinNodes                        int32                           `yaml:"minNodes"`
+	MaxNodes                        int32                           `yaml:"maxNodes"`
+	DNSManagement                   bool                            `yaml:"dnsManagement"`
+	DNSManagementServiceAccount     DNSManagementServiceAccount     `yaml:"dnsManagementServiceAccount"`
+	StorageManagementServiceAccount StorageManagementServiceAccount `yaml:"storageManagementServiceAccount"`
+	KeyPair                         string                          `yaml:"keyPair"`
+	Tags                            map[string]string               `yaml:"tags"`
 }
 
 // AvailabilityZone contains configuration options for an EKS cluster
@@ -42,6 +43,13 @@ type AvailabilityZone struct {
 // DNSManagementServiceAccount contains the name and namespace for the
 // Kubernetes service account that needs access to manage Route53 DNS records.
 type DNSManagementServiceAccount struct {
+	Name      string `yaml:"name"`
+	Namespace string `yaml:"namespace"`
+}
+
+// StorageManagementServiceAccount contains the name and namespace for the
+// Kubernetes service account that needs access to manage storage provisioning.
+type StorageManagementServiceAccount struct {
 	Name      string `yaml:"name"`
 	Namespace string `yaml:"namespace"`
 }
