@@ -19,6 +19,7 @@ type ResourceConfig struct {
 	ClusterCIDR                     string                          `yaml:"clusterCIDR"`
 	AvailabilityZones               []AvailabilityZone              `yaml:"availabilityZones"`
 	InstanceTypes                   []string                        `yaml:"instanceTypes"`
+	InitialNodes                    int32                           `yaml:"initialNodes"`
 	MinNodes                        int32                           `yaml:"minNodes"`
 	MaxNodes                        int32                           `yaml:"maxNodes"`
 	DNSManagement                   bool                            `yaml:"dnsManagement"`
