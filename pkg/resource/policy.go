@@ -52,6 +52,59 @@ func (c *ResourceClient) CreateDNSManagementPolicy(tags *[]types.Tag) (*types.Po
 	return r53PolicyResp.Policy, nil
 }
 
+// CreateClusterAutoscalingPolicy creates the IAM policy to be used for cluster
+// autoscaling to manage node pool sizes.
+func (c *ResourceClient) CreateClusterAutoscalingPolicy(
+	tags *[]types.Tag,
+	clusterName string,
+) (*types.Policy, error) {
+	svc := iam.NewFromConfig(*c.AWSConfig)
+
+	autoscalingPolicyName := "ClusterAutoscaler"
+	autoscalingPolicyDescription := "Allow cluster autoscaler to manage node pool sizes"
+	autoscalingPolicyDocument := fmt.Sprintf(`{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "autoscaling:SetDesiredCapacity",
+                "autoscaling:TerminateInstanceInAutoScalingGroup"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:ResourceTag/k8s.io/cluster-autoscaler/%s": "owned"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "autoscaling:DescribeAutoScalingInstances",
+                "autoscaling:DescribeAutoScalingGroups",
+                "ec2:DescribeLaunchTemplateVersions",
+                "autoscaling:DescribeTags",
+                "autoscaling:DescribeLaunchConfigurations",
+                "ec2:DescribeInstanceTypes"
+            ],
+            "Resource": "*"
+        }
+    ]
+}`, clusterName)
+	createAutoscalingPolicyInput := iam.CreatePolicyInput{
+		PolicyName:     &autoscalingPolicyName,
+		Description:    &autoscalingPolicyDescription,
+		PolicyDocument: &autoscalingPolicyDocument,
+	}
+	autoscalingPolicyResp, err := svc.CreatePolicy(c.Context, &createAutoscalingPolicyInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cluster autoscaler management policy %s: %w", autoscalingPolicyName, err)
+	}
+
+	return autoscalingPolicyResp.Policy, nil
+}
+
 // DeletePolicies deletes the IAM policies.  If the policyARNs slice is empty it
 // returns without error.
 func (c *ResourceClient) DeletePolicies(policyARNs []string) error {

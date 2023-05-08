@@ -51,7 +51,7 @@ func (c *ResourceClient) CreateNodeGroups(
 			RemoteAccess:  &remoteAccessConfig,
 			Tags:          *tags,
 			ScalingConfig: &types.NodegroupScalingConfig{
-				DesiredSize: &nodeGroupInitialSize,
+				DesiredSize: &initialNodes,
 				MaxSize:     &maxNodes,
 				MinSize:     &minNodes,
 			},

@@ -13,6 +13,7 @@ const (
 	ClusterRoleName            = "eks-cluster-role"
 	WorkerRoleName             = "eks-cluster-workler-role"
 	DNSManagementRoleName      = "eks-cluster-dns-management-role"
+	ClusterAutoscalingRoleName = "eks-cluster-cluster-autoscaler-role"
 	StorageManagementRoleName  = "eks-cluster-csi-driver-role"
 	ClusterPolicyARN           = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 	WorkerNodePolicyARN        = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
@@ -154,6 +155,61 @@ func (c *ResourceClient) CreateDNSManagementRole(
 	}
 
 	return dnsManagementRoleResp.Role, nil
+}
+
+// CreateClusterAutoscalingRole creates the IAM role needed for cluster
+// autoscaler to manage node pool sizes using IRSA (IAM role for service
+// accounts).
+func (c *ResourceClient) CreateClusterAutoscalingRole(
+	tags *[]types.Tag,
+	autoscalingPolicyARN string,
+	awsAccountID string,
+	oidcProvider string,
+	serviceAccount *ClusterAutoscalingServiceAccount,
+) (*types.Role, error) {
+	svc := iam.NewFromConfig(*c.AWSConfig)
+
+	oidcProviderBare := strings.Trim(oidcProvider, "https://")
+	clusterAutoscalingRoleName := ClusterAutoscalingRoleName
+	clusterAutoscalingRolePolicyDocument := fmt.Sprintf(`{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": "arn:aws:iam::%[1]s:oidc-provider/%[2]s"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+                "StringEquals": {
+                    "%[2]s:sub": "system:serviceaccount:%[3]s:%[4]s",
+                    "%[2]s:aud": "sts.amazonaws.com"
+                }
+            }
+        }
+    ]
+}`, awsAccountID, oidcProviderBare, serviceAccount.Namespace, serviceAccount.Name)
+	createClusterAutoscalingRoleInput := iam.CreateRoleInput{
+		AssumeRolePolicyDocument: &clusterAutoscalingRolePolicyDocument,
+		RoleName:                 &clusterAutoscalingRoleName,
+		PermissionsBoundary:      &autoscalingPolicyARN,
+		Tags:                     *tags,
+	}
+	clusterAutoscalingRoleResp, err := svc.CreateRole(c.Context, &createClusterAutoscalingRoleInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create role %s: %w", clusterAutoscalingRoleName, err)
+	}
+
+	attachClusterAutoscalingRolePolicyInput := iam.AttachRolePolicyInput{
+		PolicyArn: &autoscalingPolicyARN,
+		RoleName:  clusterAutoscalingRoleResp.Role.RoleName,
+	}
+	_, err = svc.AttachRolePolicy(c.Context, &attachClusterAutoscalingRolePolicyInput)
+	if err != nil {
+		return clusterAutoscalingRoleResp.Role, fmt.Errorf("failed to attach role policy %s to %s: %w", autoscalingPolicyARN, clusterAutoscalingRoleName, err)
+	}
+
+	return clusterAutoscalingRoleResp.Role, nil
 }
 
 // CreateStorageManagementRole creates the IAM role needed for storage

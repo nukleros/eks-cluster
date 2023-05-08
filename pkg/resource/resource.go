@@ -127,12 +127,11 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 			privateRouteTableIDs, *publicRouteTable.RouteTableId)
 	}
 
-	// IAM Policy for DNS management
+	// IAM Policy for DNS Management
 	var createdDNSPolicy types.Policy
 	if resourceConfig.DNSManagement {
 		dnsPolicy, err := c.CreateDNSManagementPolicy(iamTags)
 		if dnsPolicy != nil {
-			//inventory.DNSManagementPolicyARN = *dnsPolicy.Arn
 			inventory.PolicyARNs = append(inventory.PolicyARNs, *dnsPolicy.Arn)
 		}
 		if err != nil {
@@ -142,6 +141,22 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 			*c.MessageChan <- fmt.Sprintf("IAM policy created: %s\n", *dnsPolicy.PolicyName)
 		}
 		createdDNSPolicy = *dnsPolicy
+	}
+
+	// IAM Policy for Cluster Autoscaling
+	var createdClusterAutoscalingPolicy types.Policy
+	if resourceConfig.ClusterAutoscaling {
+		clusterAutoscalingPolicy, err := c.CreateClusterAutoscalingPolicy(iamTags, resourceConfig.Name)
+		if clusterAutoscalingPolicy != nil {
+			inventory.PolicyARNs = append(inventory.PolicyARNs, *clusterAutoscalingPolicy.Arn)
+		}
+		if err != nil {
+			return &inventory, err
+		}
+		if c.MessageChan != nil {
+			*c.MessageChan <- fmt.Sprintf("IAM policy created: %s\n", *clusterAutoscalingPolicy.PolicyName)
+		}
+		createdClusterAutoscalingPolicy = *clusterAutoscalingPolicy
 	}
 
 	// IAM Roles
@@ -195,7 +210,8 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 	// Node Groups
 	var nodeGroupNames []string
 	nodeGroups, err := c.CreateNodeGroups(&mapTags, *cluster.Name, resourceConfig.KubernetesVersion,
-		*workerRole.Arn, privateSubnetIDs, resourceConfig.InstanceTypes, resourceConfig.MinNodes, resourceConfig.MaxNodes, resourceConfig.KeyPair)
+		*workerRole.Arn, privateSubnetIDs, resourceConfig.InstanceTypes,
+		resourceConfig.InitialNodes, resourceConfig.MinNodes, resourceConfig.MaxNodes, resourceConfig.KeyPair)
 	if nodeGroups != nil {
 		for _, nodeGroup := range *nodeGroups {
 			nodeGroupNames = append(nodeGroupNames, *nodeGroup.NodegroupName)
@@ -244,6 +260,25 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 				RoleName:       *dnsManagementRole.RoleName,
 				RoleARN:        *dnsManagementRole.Arn,
 				RolePolicyARNs: []string{*createdDNSPolicy.Arn},
+			}
+		}
+		if err != nil {
+			return &inventory, err
+		}
+	}
+
+	// IAM Role for Cluster Autoscaling
+	if resourceConfig.ClusterAutoscaling {
+		if createdClusterAutoscalingPolicy.Arn == nil {
+			return &inventory, errors.New("no cluster autoscaling policy ARN to attach to cluster autoscaling role")
+		}
+		clusterAutoscalingRole, err := c.CreateClusterAutoscalingRole(iamTags, *createdClusterAutoscalingPolicy.Arn,
+			resourceConfig.AWSAccountID, oidcIssuer, &resourceConfig.ClusterAutoscalingServiceAccount)
+		if clusterAutoscalingRole != nil {
+			inventory.ClusterAutoscalingRole = RoleInventory{
+				RoleName:       *clusterAutoscalingRole.RoleName,
+				RoleARN:        *clusterAutoscalingRole.Arn,
+				RolePolicyARNs: []string{*clusterAutoscalingRole.PermissionsBoundary.PermissionsBoundaryArn},
 			}
 		}
 		if err != nil {
@@ -318,12 +353,18 @@ func (c *ResourceClient) DeleteResourceStack(resourceInv *ResourceInventory) err
 	}
 
 	// IAM Roles
-	iamRoles := []RoleInventory{resourceInv.ClusterRole, resourceInv.WorkerRole, resourceInv.DNSManagementRole, resourceInv.StorageManagementRole}
+	iamRoles := []RoleInventory{
+		resourceInv.ClusterRole,
+		resourceInv.WorkerRole,
+		resourceInv.DNSManagementRole,
+		resourceInv.ClusterAutoscalingRole,
+		resourceInv.StorageManagementRole,
+	}
 	if err := c.DeleteRoles(&iamRoles); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("IAM roles deleted: [%s %s]\n", &resourceInv.ClusterRole, &resourceInv.WorkerRole)
+		*c.MessageChan <- fmt.Sprintf("IAM roles deleted: %s\n", iamRoles)
 	}
 
 	// IAM Policies
