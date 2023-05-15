@@ -278,6 +278,10 @@ func (c *ResourceClient) DeleteRoles(roles *[]RoleInventory) error {
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	for _, role := range *roles {
+		if role.RoleName == "" {
+			// role is empty - skip
+			continue
+		}
 		for _, policyARN := range role.RolePolicyARNs {
 			detachRolePolicyInput := iam.DetachRolePolicyInput{
 				PolicyArn: &policyARN,
