@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -71,24 +72,9 @@ func NewResourceConfig() *ResourceConfig {
 		KubernetesVersion: DefaultKubernetesVersion,
 		Region:            "us-east-2",
 		ClusterCIDR:       "10.0.0.0/16",
-		AvailabilityZones: []AvailabilityZone{
-			{
-				Zone:              "us-east-2a",
-				PrivateSubnetCIDR: "10.0.0.0/22",
-				PublicSubnetCIDR:  "10.0.4.0/22",
-			}, {
-				Zone:              "us-east-2b",
-				PrivateSubnetCIDR: "10.0.8.0/22",
-				PublicSubnetCIDR:  "10.0.12.0/22",
-			}, {
-				Zone:              "us-east-2b",
-				PrivateSubnetCIDR: "10.0.16.0/22",
-				PublicSubnetCIDR:  "10.0.20.0/22",
-			},
-		},
-		InstanceTypes: []string{"t2.micro"},
-		MinNodes:      int32(2),
-		MaxNodes:      int32(4),
+		InstanceTypes:     []string{"t2.micro"},
+		MinNodes:          int32(2),
+		MaxNodes:          int32(4),
 	}
 }
 
@@ -103,4 +89,28 @@ func LoadAWSConfig(configEnv bool, configProfile, region string) (*aws.Config, e
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 	return &awsConfig, err
+}
+
+func (r *ResourceConfig) SetAvailabilityZones(resourceClient *ResourceClient) error {
+	// make sure region is set
+	if r.Region == "" {
+		return errors.New("must have regions set")
+	}
+
+	// if availability zones provided, nothing to do
+	if len(r.AvailabilityZones) > 0 {
+		return nil
+	}
+
+	// otherwise set based on number of desired availability zones
+	availabilityZones, err := resourceClient.GetAvailabilityZonesForRegion(r.Region)
+	if err != nil {
+		return fmt.Errorf(
+			fmt.Sprintf("failed to get availability zones for region %s", r.Region),
+			err,
+		)
+	}
+	r.AvailabilityZones = *availabilityZones
+
+	return nil
 }

@@ -28,6 +28,11 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 	iamTags := CreateIAMTags(resourceConfig.Name, resourceConfig.Tags)
 	mapTags := CreateMapTags(resourceConfig.Name, resourceConfig.Tags)
 
+	// set availability zones as needed
+	if err := resourceConfig.SetAvailabilityZones(c); err != nil {
+		return &inventory, err
+	}
+
 	// VPC
 	vpc, err := c.CreateVPC(ec2Tags, resourceConfig.ClusterCIDR, resourceConfig.Name)
 	if vpc != nil {
