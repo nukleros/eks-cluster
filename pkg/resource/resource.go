@@ -21,7 +21,14 @@ var ErrResourceNotFound = errors.New("resource not found")
 
 // CreateResourceStack creates all the resources for an EKS cluster.
 func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*ResourceInventory, error) {
-	inventory := ResourceInventory{Region: resourceConfig.Region}
+	var inventory ResourceInventory
+	if resourceConfig.Region != "" {
+		inventory.Region = resourceConfig.Region
+		c.AWSConfig.Region = resourceConfig.Region
+	} else {
+		inventory.Region = c.AWSConfig.Region
+		resourceConfig.Region = c.AWSConfig.Region
+	}
 
 	// Tags
 	ec2Tags := CreateEC2Tags(resourceConfig.Name, resourceConfig.Tags)
@@ -319,6 +326,8 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 
 // DeleteResourceStack deletes all the resources in the resource inventory.
 func (c *ResourceClient) DeleteResourceStack(resourceInv *ResourceInventory) error {
+	c.AWSConfig.Region = resourceInv.Region
+
 	// OIDC Provider
 	if err := c.DeleteOIDCProvider(resourceInv.OIDCProviderARN); err != nil {
 		return err

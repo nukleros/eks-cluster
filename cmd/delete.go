@@ -32,8 +32,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		// create resource client
-		awsConfig, err := resource.LoadAWSConfig(
-			awsConfigEnv, awsConfigProfile, awsRegion)
+		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "")
 		if err != nil {
 			return err
 		}

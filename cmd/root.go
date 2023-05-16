@@ -30,15 +30,15 @@ https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 
 If neither flag is provided, the 'default' config profile will be used.
 
-In any case, the default region can be overridden with --aws-region flag to
-specify the region for any particular install.
+In any case, the default region can be overridden with the eks-cluster
+config file.  If you set the region there, that value will take
+precedence.
 `,
 }
 
 var (
 	awsConfigEnv     bool
 	awsConfigProfile string
-	awsRegion        string
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -56,8 +56,6 @@ func init() {
 		"The AWS config profile to draw credentials from when provisioning resources")
 	rootCmd.PersistentFlags().BoolVarP(&awsConfigEnv, "aws-config-env", "e", false,
 		"Retrieve credentials from environment variables")
-	rootCmd.PersistentFlags().StringVarP(&awsRegion, "aws-region", "r", "",
-		"AWS region code to install cluster in")
 }
 
 // outputMessages prints the output messages from the resource client to the

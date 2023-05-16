@@ -38,9 +38,9 @@ var createCmd = &cobra.Command{
 			}
 		}
 
-		// create resource client
-		awsConfig, err := resource.LoadAWSConfig(
-			awsConfigEnv, awsConfigProfile, awsRegion)
+		// create resource client - region is not passed since it can be set in
+		// the config file if needed
+		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "")
 		if err != nil {
 			return err
 		}

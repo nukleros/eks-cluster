@@ -37,9 +37,5 @@ Delete the cluster:
 ./eks-cluster delete
 ```
 
-## Config Options
-
-TODO: Region and availability zones
-
 TODO: EC2 instance remote access
 

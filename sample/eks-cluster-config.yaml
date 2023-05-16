@@ -1,5 +1,5 @@
 name: sample-cluster
-region: "us-east-2"
+#region: "us-west-1"
 awsAccountID: "575822346426"
 instanceTypes:
   - "t3.micro"

@@ -70,7 +70,6 @@ func NewResourceConfig() *ResourceConfig {
 	return &ResourceConfig{
 		Name:              "eks-cluster",
 		KubernetesVersion: DefaultKubernetesVersion,
-		Region:            "us-east-2",
 		ClusterCIDR:       "10.0.0.0/16",
 		InstanceTypes:     []string{"t2.micro"},
 		MinNodes:          int32(2),
@@ -92,9 +91,9 @@ func LoadAWSConfig(configEnv bool, configProfile, region string) (*aws.Config, e
 }
 
 func (r *ResourceConfig) SetAvailabilityZones(resourceClient *ResourceClient) error {
-	// make sure region is set
+	// ensure region is in resource config
 	if r.Region == "" {
-		return errors.New("must have regions set")
+		return errors.New("region is not set in resource config")
 	}
 
 	// if availability zones provided, nothing to do
