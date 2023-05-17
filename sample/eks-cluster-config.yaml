@@ -1,4 +1,4 @@
-name: sample-cluster
+name: sample-cluster-0
 #region: "us-west-1"
 awsAccountID: "575822346426"
 instanceTypes:

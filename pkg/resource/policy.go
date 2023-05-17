@@ -8,12 +8,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 )
 
+const (
+	DNSPolicyName         = "DNSUpdates"
+	AutoscalingPolicyName = "ClusterAutoscaler"
+)
+
 // CreateDNSManagementPolicy creates the IAM policy to be used for managing
 // Route53 DNS records.
-func (c *ResourceClient) CreateDNSManagementPolicy(tags *[]types.Tag) (*types.Policy, error) {
+func (c *ResourceClient) CreateDNSManagementPolicy(tags *[]types.Tag, clusterName string) (*types.Policy, error) {
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
-	dnsPolicyName := "DNSUpdates"
+	dnsPolicyName := fmt.Sprintf("%s-%s", DNSPolicyName, clusterName)
 	dnsPolicyDescription := "Allow cluster services to update Route53 records"
 	dnsPolicyDocument := `{
 "Version": "2012-10-17",
@@ -60,7 +65,7 @@ func (c *ResourceClient) CreateClusterAutoscalingPolicy(
 ) (*types.Policy, error) {
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
-	autoscalingPolicyName := "ClusterAutoscaler"
+	autoscalingPolicyName := fmt.Sprintf("%s-%s", AutoscalingPolicyName, clusterName)
 	autoscalingPolicyDescription := "Allow cluster autoscaler to manage node pool sizes"
 	autoscalingPolicyDocument := fmt.Sprintf(`{
     "Version": "2012-10-17",

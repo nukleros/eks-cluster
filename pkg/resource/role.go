@@ -23,10 +23,10 @@ const (
 )
 
 // CreateRoles creates the IAM roles needed for EKS clusters and node groups.
-func (c *ResourceClient) CreateRoles(tags *[]types.Tag) (*types.Role, *types.Role, error) {
+func (c *ResourceClient) CreateRoles(tags *[]types.Tag, clusterName string) (*types.Role, *types.Role, error) {
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
-	clusterRoleName := ClusterRoleName
+	clusterRoleName := fmt.Sprintf("%s-%s", ClusterRoleName, clusterName)
 	clusterPolicyARN := ClusterPolicyARN
 	clusterRolePolicyDocument := `{
   "Version": "2012-10-17",
@@ -62,7 +62,7 @@ func (c *ResourceClient) CreateRoles(tags *[]types.Tag) (*types.Role, *types.Rol
 		return clusterRoleResp.Role, nil, fmt.Errorf("failed to attach role policy %s to %s: %w", clusterPolicyARN, clusterRoleName, err)
 	}
 
-	workerRoleName := WorkerRoleName
+	workerRoleName := fmt.Sprintf("%s-%s", WorkerRoleName, clusterName)
 	workerRolePolicyDocument := `{
   "Version": "2012-10-17",
   "Statement": [
@@ -111,11 +111,12 @@ func (c *ResourceClient) CreateDNSManagementRole(
 	awsAccountID string,
 	oidcProvider string,
 	serviceAccount *DNSManagementServiceAccount,
+	clusterName string,
 ) (*types.Role, error) {
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
-	dnsManagementRoleName := DNSManagementRoleName
+	dnsManagementRoleName := fmt.Sprintf("%s-%s", DNSManagementRoleName, clusterName)
 	dnsManagementRolePolicyDocument := fmt.Sprintf(`{
     "Version": "2012-10-17",
     "Statement": [
@@ -166,11 +167,12 @@ func (c *ResourceClient) CreateClusterAutoscalingRole(
 	awsAccountID string,
 	oidcProvider string,
 	serviceAccount *ClusterAutoscalingServiceAccount,
+	clusterName string,
 ) (*types.Role, error) {
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
-	clusterAutoscalingRoleName := ClusterAutoscalingRoleName
+	clusterAutoscalingRoleName := fmt.Sprintf("%s-%s", ClusterAutoscalingRoleName, clusterName)
 	clusterAutoscalingRolePolicyDocument := fmt.Sprintf(`{
     "Version": "2012-10-17",
     "Statement": [
@@ -220,11 +222,12 @@ func (c *ResourceClient) CreateStorageManagementRole(
 	awsAccountID string,
 	oidcProvider string,
 	serviceAccount *StorageManagementServiceAccount,
+	clusterName string,
 ) (*types.Role, error) {
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
-	storageManagementRoleName := StorageManagementRoleName
+	storageManagementRoleName := fmt.Sprintf("%s-%s", StorageManagementRoleName, clusterName)
 	storagePolicyARN := CSIDriverPolicyARN
 	storageManagementRolePolicyDocument := fmt.Sprintf(`{
     "Version": "2012-10-17",

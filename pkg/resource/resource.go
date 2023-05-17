@@ -142,7 +142,7 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 	// IAM Policy for DNS Management
 	var createdDNSPolicy types.Policy
 	if resourceConfig.DNSManagement {
-		dnsPolicy, err := c.CreateDNSManagementPolicy(iamTags)
+		dnsPolicy, err := c.CreateDNSManagementPolicy(iamTags, resourceConfig.Name)
 		if dnsPolicy != nil {
 			inventory.PolicyARNs = append(inventory.PolicyARNs, *dnsPolicy.Arn)
 		}
@@ -172,7 +172,7 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 	}
 
 	// IAM Roles
-	clusterRole, workerRole, err := c.CreateRoles(iamTags)
+	clusterRole, workerRole, err := c.CreateRoles(iamTags, resourceConfig.Name)
 	if clusterRole != nil {
 		inventory.ClusterRole = RoleInventory{
 			RoleName:       *clusterRole.RoleName,
@@ -266,7 +266,8 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 			return &inventory, errors.New("no DNS policy ARN to attach to DNS management role")
 		}
 		dnsManagementRole, err := c.CreateDNSManagementRole(iamTags, *createdDNSPolicy.Arn,
-			resourceConfig.AWSAccountID, oidcIssuer, &resourceConfig.DNSManagementServiceAccount)
+			resourceConfig.AWSAccountID, oidcIssuer, &resourceConfig.DNSManagementServiceAccount,
+			resourceConfig.Name)
 		if dnsManagementRole != nil {
 			inventory.DNSManagementRole = RoleInventory{
 				RoleName:       *dnsManagementRole.RoleName,
@@ -285,7 +286,8 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 			return &inventory, errors.New("no cluster autoscaling policy ARN to attach to cluster autoscaling role")
 		}
 		clusterAutoscalingRole, err := c.CreateClusterAutoscalingRole(iamTags, *createdClusterAutoscalingPolicy.Arn,
-			resourceConfig.AWSAccountID, oidcIssuer, &resourceConfig.ClusterAutoscalingServiceAccount)
+			resourceConfig.AWSAccountID, oidcIssuer, &resourceConfig.ClusterAutoscalingServiceAccount,
+			resourceConfig.Name)
 		if clusterAutoscalingRole != nil {
 			inventory.ClusterAutoscalingRole = RoleInventory{
 				RoleName:       *clusterAutoscalingRole.RoleName,
@@ -300,7 +302,7 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 
 	// IAM Role for Storage Management
 	storageManagementRole, err := c.CreateStorageManagementRole(iamTags, resourceConfig.AWSAccountID,
-		oidcIssuer, &resourceConfig.StorageManagementServiceAccount)
+		oidcIssuer, &resourceConfig.StorageManagementServiceAccount, resourceConfig.Name)
 	if storageManagementRole != nil {
 		inventory.StorageManagementRole = RoleInventory{
 			RoleName:       *storageManagementRole.RoleName,
