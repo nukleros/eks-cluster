@@ -120,16 +120,25 @@ func (c *ResourceClient) WaitForNodeGroups(
 		return nil
 	}
 
+	var nodeGroupHealth types.NodegroupHealth
 	nodeGroupCheckCount := 0
 	for {
 		nodeGroupCheckCount += 1
 		if nodeGroupCheckCount > NodeGroupCheckMaxCount {
-			return errors.New("node group condition check timed out")
+			var issueString []string
+			//var issues types.Issue
+			for _, iss := range nodeGroupHealth.Issues {
+				issueString = append(issueString, *iss.Message)
+			}
+			issueErr := errors.New(fmt.Sprintf("issues with node group: %s", issueString))
+			return fmt.Errorf("node group condition check timed out: %w", issueErr)
 		}
 
 		allConditionsMet := true
 		for _, nodeGroupName := range nodeGroupNames {
-			nodeGroupStatus, err := c.getNodeGroupStatus(clusterName, nodeGroupName)
+			//nodeGroupStatus, err := c.getNodeGroupStatus(clusterName, nodeGroupName)
+			nodeGroup, err := c.getNodeGroupStatus(clusterName, nodeGroupName)
+			nodeGroupHealth = *nodeGroup.Health
 			if err != nil {
 				if errors.Is(err, ErrResourceNotFound) && nodeGroupCondition == NodeGroupConditionDeleted {
 					// resource was not found and we're waiting for it to be
@@ -140,7 +149,7 @@ func (c *ResourceClient) WaitForNodeGroups(
 				}
 			}
 
-			if *nodeGroupStatus == types.NodegroupStatusActive && nodeGroupCondition == NodeGroupConditionCreated {
+			if nodeGroup.Status == types.NodegroupStatusActive && nodeGroupCondition == NodeGroupConditionCreated {
 				// resource is available and we're waiting for it to be created
 				// so condition is met
 				continue
@@ -159,7 +168,8 @@ func (c *ResourceClient) WaitForNodeGroups(
 }
 
 // getNodeGroupStatus retrieves the status of a node group.
-func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (*types.NodegroupStatus, error) {
+// func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (*types.NodegroupStatus, error) {
+func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (*types.Nodegroup, error) {
 	svc := eks.NewFromConfig(*c.AWSConfig)
 
 	describeNodeGroupInput := eks.DescribeNodegroupInput{
@@ -176,5 +186,6 @@ func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (
 		}
 	}
 
-	return &resp.Nodegroup.Status, nil
+	//return &resp.Nodegroup.Status, nil
+	return resp.Nodegroup, nil
 }
