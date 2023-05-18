@@ -45,12 +45,14 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 		return err
 	}
 
+	var errWrite error
+
 	// VPC
 	vpc, err := c.CreateVPC(ec2Tags, resourceConfig.ClusterCIDR, resourceConfig.Name)
 	if vpc != nil {
 		inventory.VPCID = *vpc.VpcId
-		err = WriteInventory(inventoryFile, &inventory)
-		if err != nil {
+		errWrite = WriteInventory(inventoryFile, &inventory)
+		if errWrite != nil {
 			return err
 		}
 	}
@@ -65,8 +67,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 	igw, err := c.CreateInternetGateway(ec2Tags, *vpc.VpcId, resourceConfig.Name)
 	if igw != nil {
 		inventory.InternetGatewayID = *igw.InternetGatewayId
-		err = WriteInventory(inventoryFile, &inventory)
-		if err != nil {
+		errWrite = WriteInventory(inventoryFile, &inventory)
+		if errWrite != nil {
 			return err
 		}
 	}
@@ -95,8 +97,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 		}
 	}
 	inventory.SubnetIDs = allSubnetIDs
-	err = WriteInventory(inventoryFile, &inventory)
-	if err != nil {
+	errWrite := WriteInventory(inventoryFile, &inventory)
+	if errWrite != nil {
 		return err
 	}
 	if err != nil {
@@ -109,6 +111,10 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 	// Elastic IPs
 	elasticIPIDs, err := c.CreateElasticIPs(ec2Tags, publicSubnetIDs)
 	inventory.ElasticIPIDs = elasticIPIDs
+	errWrite = WriteInventory(inventoryFile, &inventory)
+	if errWrite != nil {
+		return err
+	}
 	if err != nil {
 		return err
 	}
@@ -144,14 +150,14 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 		}
 	}
 	inventory.PrivateRouteTableIDs = privateRouteTableIDs
-	err = WriteInventory(inventoryFile, &inventory)
-	if err != nil {
+	errWrite = WriteInventory(inventoryFile, &inventory)
+	if errWrite != nil {
 		return err
 	}
 	if publicRouteTable != nil {
 		inventory.PublicRouteTableID = *publicRouteTable.RouteTableId
-		err = WriteInventory(inventoryFile, &inventory)
-		if err != nil {
+		errWrite = WriteInventory(inventoryFile, &inventory)
+		if errWrite != nil {
 			return err
 		}
 	}
@@ -170,8 +176,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 		dnsPolicy, err := c.CreateDNSManagementPolicy(iamTags, resourceConfig.Name)
 		if dnsPolicy != nil {
 			inventory.PolicyARNs = append(inventory.PolicyARNs, *dnsPolicy.Arn)
-			err = WriteInventory(inventoryFile, &inventory)
-			if err != nil {
+			errWrite = WriteInventory(inventoryFile, &inventory)
+			if errWrite != nil {
 				return err
 			}
 		}
@@ -190,13 +196,13 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 		clusterAutoscalingPolicy, err := c.CreateClusterAutoscalingPolicy(iamTags, resourceConfig.Name)
 		if clusterAutoscalingPolicy != nil {
 			inventory.PolicyARNs = append(inventory.PolicyARNs, *clusterAutoscalingPolicy.Arn)
-			err = WriteInventory(inventoryFile, &inventory)
-			if err != nil {
+			errWrite = WriteInventory(inventoryFile, &inventory)
+			if errWrite != nil {
 				return err
 			}
 		}
 		if err != nil {
-			return  err
+			return err
 		}
 		if c.MessageChan != nil {
 			*c.MessageChan <- fmt.Sprintf("IAM policy created: %s\n", *clusterAutoscalingPolicy.PolicyName)
@@ -233,8 +239,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 	if cluster != nil {
 		inventory.Cluster.ClusterName = *cluster.Name
 		inventory.Cluster.ClusterARN = *cluster.Arn
-		err = WriteInventory(inventoryFile, &inventory)
-		if err != nil {
+		errWrite = WriteInventory(inventoryFile, &inventory)
+		if errWrite != nil {
 			return err
 		}
 	}
@@ -266,8 +272,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 			nodeGroupNames = append(nodeGroupNames, *nodeGroup.NodegroupName)
 		}
 		inventory.NodeGroupNames = nodeGroupNames
-		err = WriteInventory(inventoryFile, &inventory)
-		if err != nil {
+		errWrite = WriteInventory(inventoryFile, &inventory)
+		if errWrite != nil {
 			return err
 		}
 	}
@@ -315,8 +321,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 				RoleARN:        *dnsManagementRole.Arn,
 				RolePolicyARNs: []string{*createdDNSPolicy.Arn},
 			}
-			err = WriteInventory(inventoryFile, &inventory)
-			if err != nil {
+			errWrite = WriteInventory(inventoryFile, &inventory)
+			if errWrite != nil {
 				return err
 			}
 		}
@@ -339,8 +345,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 				RoleARN:        *clusterAutoscalingRole.Arn,
 				RolePolicyARNs: []string{*clusterAutoscalingRole.PermissionsBoundary.PermissionsBoundaryArn},
 			}
-			err = WriteInventory(inventoryFile, &inventory)
-			if err != nil {
+			errWrite = WriteInventory(inventoryFile, &inventory)
+			if errWrite != nil {
 				return err
 			}
 		}
@@ -358,8 +364,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 			RoleARN:        *storageManagementRole.Arn,
 			RolePolicyARNs: []string{*storageManagementRole.PermissionsBoundary.PermissionsBoundaryArn},
 		}
-		err = WriteInventory(inventoryFile, &inventory)
-		if err != nil {
+		errWrite = WriteInventory(inventoryFile, &inventory)
+		if errWrite != nil {
 			return err
 		}
 	}
