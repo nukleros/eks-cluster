@@ -138,7 +138,9 @@ func (c *ResourceClient) WaitForNodeGroups(
 		for _, nodeGroupName := range nodeGroupNames {
 			//nodeGroupStatus, err := c.getNodeGroupStatus(clusterName, nodeGroupName)
 			nodeGroup, err := c.getNodeGroupStatus(clusterName, nodeGroupName)
-			nodeGroupHealth = *nodeGroup.Health
+			if nodeGroup != nil && nodeGroup.Health != nil {
+				nodeGroupHealth = *nodeGroup.Health
+			}
 			if err != nil {
 				if errors.Is(err, ErrResourceNotFound) && nodeGroupCondition == NodeGroupConditionDeleted {
 					// resource was not found and we're waiting for it to be
