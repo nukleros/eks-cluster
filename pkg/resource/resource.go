@@ -97,7 +97,7 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 		}
 	}
 	inventory.SubnetIDs = allSubnetIDs
-	errWrite := WriteInventory(inventoryFile, &inventory)
+	errWrite = WriteInventory(inventoryFile, &inventory)
 	if errWrite != nil {
 		return err
 	}
