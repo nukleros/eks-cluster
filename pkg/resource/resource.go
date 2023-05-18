@@ -20,7 +20,7 @@ type ResourceClient struct {
 var ErrResourceNotFound = errors.New("resource not found")
 
 // CreateResourceStack creates all the resources for an EKS cluster.
-func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*ResourceInventory, error) {
+func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfig *ResourceConfig) error {
 	var inventory ResourceInventory
 	if resourceConfig.Region != "" {
 		inventory.Region = resourceConfig.Region
@@ -30,6 +30,11 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 		resourceConfig.Region = c.AWSConfig.Region
 	}
 
+	err := WriteInventory(inventoryFile, &inventory)
+	if err != nil {
+		return err
+	}
+
 	// Tags
 	ec2Tags := CreateEC2Tags(resourceConfig.Name, resourceConfig.Tags)
 	iamTags := CreateIAMTags(resourceConfig.Name, resourceConfig.Tags)
@@ -37,16 +42,20 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 
 	// set availability zones as needed
 	if err := resourceConfig.SetAvailabilityZones(c); err != nil {
-		return &inventory, err
+		return err
 	}
 
 	// VPC
 	vpc, err := c.CreateVPC(ec2Tags, resourceConfig.ClusterCIDR, resourceConfig.Name)
 	if vpc != nil {
 		inventory.VPCID = *vpc.VpcId
+		err = WriteInventory(inventoryFile, &inventory)
+		if err != nil {
+			return err
+		}
 	}
 	if err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("VPC created: %s\n", *vpc.VpcId)
@@ -56,9 +65,13 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 	igw, err := c.CreateInternetGateway(ec2Tags, *vpc.VpcId, resourceConfig.Name)
 	if igw != nil {
 		inventory.InternetGatewayID = *igw.InternetGatewayId
+		err = WriteInventory(inventoryFile, &inventory)
+		if err != nil {
+			return err
+		}
 	}
 	if err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("Internet gateway created: %s\n", *igw.InternetGatewayId)
@@ -82,8 +95,12 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 		}
 	}
 	inventory.SubnetIDs = allSubnetIDs
+	err = WriteInventory(inventoryFile, &inventory)
 	if err != nil {
-		return &inventory, err
+		return err
+	}
+	if err != nil {
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("Subnets created: %s\n", allSubnetIDs)
@@ -93,7 +110,7 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 	elasticIPIDs, err := c.CreateElasticIPs(ec2Tags, publicSubnetIDs)
 	inventory.ElasticIPIDs = elasticIPIDs
 	if err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("Elastic IPs created: %s\n", elasticIPIDs)
@@ -104,14 +121,14 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 	// creation.  The IDs are not added to the inventory.  Instead, the NAT
 	// gateways are cleaned up by filtering by VPC ID.
 	if err := c.CreateNATGateways(ec2Tags, resourceConfig.AvailabilityZones, elasticIPIDs); err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("NAT gateways created for subnets: %s\n", privateSubnetIDs)
 		*c.MessageChan <- fmt.Sprintf("Waiting for NAT gateways to become active for subnets: %s\n", privateSubnetIDs)
 	}
 	if err := c.WaitForNATGateways(*vpc.VpcId, &resourceConfig.AvailabilityZones, NATGatewayConditionCreated); err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("NAT gateways ready for subnets: %s\n", privateSubnetIDs)
@@ -127,11 +144,19 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 		}
 	}
 	inventory.PrivateRouteTableIDs = privateRouteTableIDs
+	err = WriteInventory(inventoryFile, &inventory)
+	if err != nil {
+		return err
+	}
 	if publicRouteTable != nil {
 		inventory.PublicRouteTableID = *publicRouteTable.RouteTableId
+		err = WriteInventory(inventoryFile, &inventory)
+		if err != nil {
+			return err
+		}
 	}
 	if err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf(
@@ -145,9 +170,13 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 		dnsPolicy, err := c.CreateDNSManagementPolicy(iamTags, resourceConfig.Name)
 		if dnsPolicy != nil {
 			inventory.PolicyARNs = append(inventory.PolicyARNs, *dnsPolicy.Arn)
+			err = WriteInventory(inventoryFile, &inventory)
+			if err != nil {
+				return err
+			}
 		}
 		if err != nil {
-			return &inventory, err
+			return err
 		}
 		if c.MessageChan != nil {
 			*c.MessageChan <- fmt.Sprintf("IAM policy created: %s\n", *dnsPolicy.PolicyName)
@@ -161,9 +190,13 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 		clusterAutoscalingPolicy, err := c.CreateClusterAutoscalingPolicy(iamTags, resourceConfig.Name)
 		if clusterAutoscalingPolicy != nil {
 			inventory.PolicyARNs = append(inventory.PolicyARNs, *clusterAutoscalingPolicy.Arn)
+			err = WriteInventory(inventoryFile, &inventory)
+			if err != nil {
+				return err
+			}
 		}
 		if err != nil {
-			return &inventory, err
+			return  err
 		}
 		if c.MessageChan != nil {
 			*c.MessageChan <- fmt.Sprintf("IAM policy created: %s\n", *clusterAutoscalingPolicy.PolicyName)
@@ -188,7 +221,7 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 		}
 	}
 	if err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("IAM roles created: [%s %s]\n", *clusterRole.RoleName, *workerRole.RoleName)
@@ -200,9 +233,13 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 	if cluster != nil {
 		inventory.Cluster.ClusterName = *cluster.Name
 		inventory.Cluster.ClusterARN = *cluster.Arn
+		err = WriteInventory(inventoryFile, &inventory)
+		if err != nil {
+			return err
+		}
 	}
 	if err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("EKS cluster created: %s\n", *cluster.Name)
@@ -213,7 +250,7 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 		inventory.Cluster.OIDCProviderURL = oidcIssuer
 	}
 	if err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("EKS cluster ready: %s\n", *cluster.Name)
@@ -229,16 +266,20 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 			nodeGroupNames = append(nodeGroupNames, *nodeGroup.NodegroupName)
 		}
 		inventory.NodeGroupNames = nodeGroupNames
+		err = WriteInventory(inventoryFile, &inventory)
+		if err != nil {
+			return err
+		}
 	}
 	if err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("EKS node group created: %s\n", nodeGroupNames)
 		*c.MessageChan <- fmt.Sprintf("Waiting for EKS node group to become active: %s\n", nodeGroupNames)
 	}
 	if err := c.WaitForNodeGroups(*cluster.Name, nodeGroupNames, NodeGroupConditionCreated); err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("EKS node group ready: %s\n", nodeGroupNames)
@@ -254,7 +295,7 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 		inventory.OIDCProviderARN = oidcProviderARN
 	}
 	if err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("OIDC provider created: %s\n", oidcProviderARN)
@@ -263,7 +304,7 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 	// IAM Role for DNS Management
 	if resourceConfig.DNSManagement {
 		if createdDNSPolicy.Arn == nil {
-			return &inventory, errors.New("no DNS policy ARN to attach to DNS management role")
+			return errors.New("no DNS policy ARN to attach to DNS management role")
 		}
 		dnsManagementRole, err := c.CreateDNSManagementRole(iamTags, *createdDNSPolicy.Arn,
 			resourceConfig.AWSAccountID, oidcIssuer, &resourceConfig.DNSManagementServiceAccount,
@@ -274,16 +315,20 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 				RoleARN:        *dnsManagementRole.Arn,
 				RolePolicyARNs: []string{*createdDNSPolicy.Arn},
 			}
+			err = WriteInventory(inventoryFile, &inventory)
+			if err != nil {
+				return err
+			}
 		}
 		if err != nil {
-			return &inventory, err
+			return err
 		}
 	}
 
 	// IAM Role for Cluster Autoscaling
 	if resourceConfig.ClusterAutoscaling {
 		if createdClusterAutoscalingPolicy.Arn == nil {
-			return &inventory, errors.New("no cluster autoscaling policy ARN to attach to cluster autoscaling role")
+			return errors.New("no cluster autoscaling policy ARN to attach to cluster autoscaling role")
 		}
 		clusterAutoscalingRole, err := c.CreateClusterAutoscalingRole(iamTags, *createdClusterAutoscalingPolicy.Arn,
 			resourceConfig.AWSAccountID, oidcIssuer, &resourceConfig.ClusterAutoscalingServiceAccount,
@@ -294,9 +339,13 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 				RoleARN:        *clusterAutoscalingRole.Arn,
 				RolePolicyARNs: []string{*clusterAutoscalingRole.PermissionsBoundary.PermissionsBoundaryArn},
 			}
+			err = WriteInventory(inventoryFile, &inventory)
+			if err != nil {
+				return err
+			}
 		}
 		if err != nil {
-			return &inventory, err
+			return err
 		}
 	}
 
@@ -309,25 +358,35 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) (*R
 			RoleARN:        *storageManagementRole.Arn,
 			RolePolicyARNs: []string{*storageManagementRole.PermissionsBoundary.PermissionsBoundaryArn},
 		}
+		err = WriteInventory(inventoryFile, &inventory)
+		if err != nil {
+			return err
+		}
 	}
 	if err != nil {
-		return &inventory, err
+		return err
 	}
 
 	// EBS CSI Addon
 	ebsStorageAddon, err := c.CreateEBSStorageAddon(&mapTags, *cluster.Name, *storageManagementRole.Arn)
 	if err != nil {
-		return &inventory, err
+		return err
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("EBS storage addon created: %s\n", *ebsStorageAddon.AddonName)
 	}
 
-	return &inventory, nil
+	return nil
 }
 
 // DeleteResourceStack deletes all the resources in the resource inventory.
-func (c *ResourceClient) DeleteResourceStack(resourceInv *ResourceInventory) error {
+func (c *ResourceClient) DeleteResourceStack(inventoryFile string) error {
+
+	resourceInv, err := ReadInventory(inventoryFile)
+	if err != nil {
+		return err
+	}
+
 	c.AWSConfig.Region = resourceInv.Region
 
 	// OIDC Provider

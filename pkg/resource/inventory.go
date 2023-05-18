@@ -1,5 +1,10 @@
 package resource
 
+import (
+	"encoding/json"
+	"io/ioutil"
+)
+
 // ResourceInventory contains a record of all resources created so they can be
 // referenced and cleaned up.
 type ResourceInventory struct {
@@ -33,4 +38,32 @@ type ClusterInventory struct {
 	ClusterName     string `json:"clusterName"`
 	ClusterARN      string `json:"clusterARN"`
 	OIDCProviderURL string `json:"oidcProviderURL"`
+}
+
+func WriteInventory(inventoryFile string, inventory *ResourceInventory) error {
+	// write inventory file
+	inventoryJSON, err := json.MarshalIndent(inventory, "", "  ")
+	if err != nil {
+		return err
+	}
+	ioutil.WriteFile(inventoryFile, inventoryJSON, 0644)
+
+	return nil
+}
+
+func ReadInventory(inventoryFile string) (*ResourceInventory, error) {
+	// read inventory file
+	inventoryBytes, err := ioutil.ReadFile(inventoryFile)
+	if err != nil {
+		return nil, err
+	}
+
+	// unmarshal JSON data
+	var inventory ResourceInventory
+	err = json.Unmarshal(inventoryBytes, &inventory)
+	if err != nil {
+		return nil, err
+	}
+
+	return &inventory, nil
 }
