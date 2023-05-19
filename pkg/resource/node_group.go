@@ -14,8 +14,8 @@ type NodeGroupCondition string
 const (
 	NodeGroupConditionCreated = "NodeGroupCreated"
 	NodeGroupConditionDeleted = "NodeGroupDeleted"
-	NodeGroupCheckInterval    = 15 //check cluster status every 15 seconds
-	NodeGroupCheckMaxCount    = 60 // check 60 times before giving up (15 minutes)
+	NodeGroupCheckInterval    = 15  //check cluster status every 15 seconds
+	NodeGroupCheckMaxCount    = 240 // check 60 times before giving up (60 minutes)
 )
 
 // CreateNodeGroups creates a private node group for an EKS cluster.
@@ -107,7 +107,7 @@ func (c *ResourceClient) DeleteNodeGroups(clusterName string, nodeGroupNames []s
 }
 
 // WaitForNodeGroups waits for the provided node groups to reach a given
-// condigion.  One of:
+// condition.  One of:
 // * NodeGroupConditionCreated
 // * NodeGroupConditionDeleted
 func (c *ResourceClient) WaitForNodeGroups(
@@ -120,16 +120,22 @@ func (c *ResourceClient) WaitForNodeGroups(
 		return nil
 	}
 
+	var nodeGroupHealth types.NodegroupHealth
 	nodeGroupCheckCount := 0
 	for {
 		nodeGroupCheckCount += 1
 		if nodeGroupCheckCount > NodeGroupCheckMaxCount {
-			return errors.New("node group condition check timed out")
+			issueErr := errors.New(fmt.Sprintf("issues with node group: %s", getHealthIssues(nodeGroupHealth)))
+			return fmt.Errorf("node group condition check timed out: %w", issueErr)
 		}
 
 		allConditionsMet := true
 		for _, nodeGroupName := range nodeGroupNames {
-			nodeGroupStatus, err := c.getNodeGroupStatus(clusterName, nodeGroupName)
+			//nodeGroupStatus, err := c.getNodeGroupStatus(clusterName, nodeGroupName)
+			nodeGroup, err := c.getNodeGroupStatus(clusterName, nodeGroupName)
+			if nodeGroup != nil && nodeGroup.Health != nil {
+				nodeGroupHealth = *nodeGroup.Health
+			}
 			if err != nil {
 				if errors.Is(err, ErrResourceNotFound) && nodeGroupCondition == NodeGroupConditionDeleted {
 					// resource was not found and we're waiting for it to be
@@ -140,10 +146,13 @@ func (c *ResourceClient) WaitForNodeGroups(
 				}
 			}
 
-			if *nodeGroupStatus == types.NodegroupStatusActive && nodeGroupCondition == NodeGroupConditionCreated {
+			if nodeGroup.Status == types.NodegroupStatusActive && nodeGroupCondition == NodeGroupConditionCreated {
 				// resource is available and we're waiting for it to be created
 				// so condition is met
 				continue
+			}
+			if nodeGroup.Status == types.NodegroupStatusCreateFailed {
+				return fmt.Errorf("failed to create node group %s. Issues with node group: ", nodeGroupName, getHealthIssues(nodeGroupHealth))
 			}
 			allConditionsMet = false
 			break
@@ -152,14 +161,14 @@ func (c *ResourceClient) WaitForNodeGroups(
 		if allConditionsMet {
 			break
 		}
-		time.Sleep(time.Second * 15)
+		time.Sleep(time.Second * NodeGroupCheckInterval)
 	}
 
 	return nil
 }
 
 // getNodeGroupStatus retrieves the status of a node group.
-func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (*types.NodegroupStatus, error) {
+func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (*types.Nodegroup, error) {
 	svc := eks.NewFromConfig(*c.AWSConfig)
 
 	describeNodeGroupInput := eks.DescribeNodegroupInput{
@@ -176,5 +185,15 @@ func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (
 		}
 	}
 
-	return &resp.Nodegroup.Status, nil
+	//return &resp.Nodegroup.Status, nil
+	return resp.Nodegroup, nil
+}
+
+// getHealthIssues returns a list of health issues for a node group.
+func getHealthIssues(health types.NodegroupHealth) []string {
+	var issues []string
+	for _, issue := range health.Issues {
+		issues = append(issues, *issue.Message)
+	}
+	return issues
 }

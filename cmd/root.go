@@ -39,6 +39,7 @@ precedence.
 var (
 	awsConfigEnv     bool
 	awsConfigProfile string
+	inventoryFile    string
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.

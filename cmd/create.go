@@ -5,9 +5,11 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -16,8 +18,7 @@ import (
 )
 
 var (
-	inventoryFileOut string
-	configFile       string
+	configFile string
 )
 
 // createCmd represents the create command
@@ -49,24 +50,37 @@ var createCmd = &cobra.Command{
 		ctx := context.Background()
 		resourceClient := resource.ResourceClient{&msgChan, ctx, awsConfig}
 
+		// Create a channel to receive OS signals
+		sigs := make(chan os.Signal, 1)
+
+		// Register the channel to receive SIGINT signals
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+		// Run a goroutine to handle the signal. It will block until it receives a signal
+		go func() {
+			<-sigs
+			fmt.Println("\nReceived Ctrl+C, cleaning up resources...")
+			if err = resourceClient.DeleteResourceStack(inventoryFile); err != nil {
+				fmt.Errorf("\nError deleting resources: %s", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+		}()
+
+		fmt.Println("Running... Press Ctrl+C to exit")
+
 		// create resources
 		fmt.Println("Creating resources for EKS cluster...")
-		inventory, err := resourceClient.CreateResourceStack(resourceConfig)
+		err = resourceClient.CreateResourceStack(inventoryFile, resourceConfig)
 		if err != nil {
-			fmt.Println("Problem encountered creating resources - deleting resources that were created")
-			if deleteErr := resourceClient.DeleteResourceStack(inventory); deleteErr != nil {
+			fmt.Println("Problem encountered creating resources - deleting resources that were created: %w", err)
+			if deleteErr := resourceClient.DeleteResourceStack(inventoryFile); deleteErr != nil {
 				return fmt.Errorf("\nError creating resources: %w\nError deleting resources: %s", err, deleteErr)
 			}
 			return err
 		}
 
-		// write inventory file
-		inventoryJSON, err := json.MarshalIndent(inventory, "", "  ")
-		if err != nil {
-			return err
-		}
-		ioutil.WriteFile(inventoryFileOut, inventoryJSON, 0644)
-		fmt.Printf("Inventory file '%s' written\n", inventoryFileOut)
+		fmt.Printf("Inventory file '%s' written\n", inventoryFile)
 
 		fmt.Println("EKS cluster created")
 		return nil
@@ -78,6 +92,6 @@ func init() {
 
 	createCmd.Flags().StringVarP(&configFile, "config-file", "c", "",
 		"File to read EKS cluster config from")
-	createCmd.Flags().StringVarP(&inventoryFileOut, "inventory-file", "i",
+	createCmd.Flags().StringVarP(&inventoryFile, "inventory-file", "i",
 		"eks-cluster-inventory.json", "File to write resource inventory to")
 }

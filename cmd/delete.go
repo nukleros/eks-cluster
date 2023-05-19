@@ -13,8 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var inventoryFileIn string
-
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
@@ -23,8 +21,8 @@ var deleteCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// load inventory
 		var resourceInventory resource.ResourceInventory
-		if inventoryFileIn != "" {
-			inventoryJSON, err := ioutil.ReadFile(inventoryFileIn)
+		if inventoryFile != "" {
+			inventoryJSON, err := ioutil.ReadFile(inventoryFile)
 			if err != nil {
 				return err
 			}
@@ -43,7 +41,7 @@ var deleteCmd = &cobra.Command{
 
 		// delete resources
 		fmt.Println("Deleting resources for EKS cluster...")
-		if err := resourceClient.DeleteResourceStack(&resourceInventory); err != nil {
+		if err := resourceClient.DeleteResourceStack(inventoryFile); err != nil {
 			return err
 		}
 
@@ -53,7 +51,7 @@ var deleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		ioutil.WriteFile(inventoryFileIn, emptyInventoryJSON, 0644)
+		ioutil.WriteFile(inventoryFile, emptyInventoryJSON, 0644)
 
 		fmt.Println("EKS cluster deleted")
 		return nil
@@ -63,5 +61,5 @@ var deleteCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(deleteCmd)
 
-	deleteCmd.Flags().StringVarP(&inventoryFileIn, "inventory-file", "i", "eks-cluster-inventory.json", "File to read resource inventory from")
+	deleteCmd.Flags().StringVarP(&inventoryFile, "inventory-file", "i", "eks-cluster-inventory.json", "File to read resource inventory from")
 }
