@@ -73,7 +73,7 @@ var createCmd = &cobra.Command{
 		fmt.Println("Creating resources for EKS cluster...")
 		err = resourceClient.CreateResourceStack(inventoryFile, resourceConfig)
 		if err != nil {
-			fmt.Println("Problem encountered creating resources - deleting resources that were created")
+			fmt.Println("Problem encountered creating resources - deleting resources that were created: %w", err)
 			if deleteErr := resourceClient.DeleteResourceStack(inventoryFile); deleteErr != nil {
 				return fmt.Errorf("\nError creating resources: %w\nError deleting resources: %s", err, deleteErr)
 			}
