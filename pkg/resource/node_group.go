@@ -14,7 +14,7 @@ type NodeGroupCondition string
 const (
 	NodeGroupConditionCreated = "NodeGroupCreated"
 	NodeGroupConditionDeleted = "NodeGroupDeleted"
-	NodeGroupCheckInterval    = 15 //check cluster status every 15 seconds
+	NodeGroupCheckInterval    = 15  //check cluster status every 15 seconds
 	NodeGroupCheckMaxCount    = 240 // check 60 times before giving up (60 minutes)
 )
 
@@ -107,7 +107,7 @@ func (c *ResourceClient) DeleteNodeGroups(clusterName string, nodeGroupNames []s
 }
 
 // WaitForNodeGroups waits for the provided node groups to reach a given
-// condigion.  One of:
+// condition.  One of:
 // * NodeGroupConditionCreated
 // * NodeGroupConditionDeleted
 func (c *ResourceClient) WaitForNodeGroups(
@@ -125,12 +125,7 @@ func (c *ResourceClient) WaitForNodeGroups(
 	for {
 		nodeGroupCheckCount += 1
 		if nodeGroupCheckCount > NodeGroupCheckMaxCount {
-			var issueString []string
-			//var issues types.Issue
-			for _, iss := range nodeGroupHealth.Issues {
-				issueString = append(issueString, *iss.Message)
-			}
-			issueErr := errors.New(fmt.Sprintf("issues with node group: %s", issueString))
+			issueErr := errors.New(fmt.Sprintf("issues with node group: %s", getHealthIssues(nodeGroupHealth)))
 			return fmt.Errorf("node group condition check timed out: %w", issueErr)
 		}
 
@@ -157,7 +152,7 @@ func (c *ResourceClient) WaitForNodeGroups(
 				continue
 			}
 			if nodeGroup.Status == types.NodegroupStatusCreateFailed {
-				return fmt.Errorf("failed to create node group %s: %w", nodeGroupName, err)
+				return fmt.Errorf("failed to create node group %s. Issues with node group: ", nodeGroupName, getHealthIssues(nodeGroupHealth))
 			}
 			allConditionsMet = false
 			break
@@ -173,7 +168,6 @@ func (c *ResourceClient) WaitForNodeGroups(
 }
 
 // getNodeGroupStatus retrieves the status of a node group.
-// func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (*types.NodegroupStatus, error) {
 func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (*types.Nodegroup, error) {
 	svc := eks.NewFromConfig(*c.AWSConfig)
 
@@ -193,4 +187,13 @@ func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (
 
 	//return &resp.Nodegroup.Status, nil
 	return resp.Nodegroup, nil
+}
+
+// getHealthIssues returns a list of health issues for a node group.
+func getHealthIssues(health types.NodegroupHealth) []string {
+	var issues []string
+	for _, issue := range health.Issues {
+		issues = append(issues, *issue.Message)
+	}
+	return issues
 }
