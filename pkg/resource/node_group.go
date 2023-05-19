@@ -131,8 +131,7 @@ func (c *ResourceClient) WaitForNodeGroups(
 
 		allConditionsMet := true
 		for _, nodeGroupName := range nodeGroupNames {
-			//nodeGroupStatus, err := c.getNodeGroupStatus(clusterName, nodeGroupName)
-			nodeGroup, err := c.getNodeGroupStatus(clusterName, nodeGroupName)
+			nodeGroup, err := c.getNodeGroup(clusterName, nodeGroupName)
 			if nodeGroup != nil && nodeGroup.Health != nil {
 				nodeGroupHealth = *nodeGroup.Health
 			}
@@ -167,8 +166,8 @@ func (c *ResourceClient) WaitForNodeGroups(
 	return nil
 }
 
-// getNodeGroupStatus retrieves the status of a node group.
-func (c *ResourceClient) getNodeGroupStatus(clusterName, nodeGroupName string) (*types.Nodegroup, error) {
+// getNodeGroup retrieves the status of a node group.
+func (c *ResourceClient) getNodeGroup(clusterName, nodeGroupName string) (*types.Nodegroup, error) {
 	svc := eks.NewFromConfig(*c.AWSConfig)
 
 	describeNodeGroupInput := eks.DescribeNodegroupInput{
