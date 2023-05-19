@@ -15,7 +15,7 @@ const (
 	NodeGroupConditionCreated = "NodeGroupCreated"
 	NodeGroupConditionDeleted = "NodeGroupDeleted"
 	NodeGroupCheckInterval    = 15 //check cluster status every 15 seconds
-	NodeGroupCheckMaxCount    = 60 // check 60 times before giving up (15 minutes)
+	NodeGroupCheckMaxCount    = 240 // check 60 times before giving up (60 minutes)
 )
 
 // CreateNodeGroups creates a private node group for an EKS cluster.
@@ -156,6 +156,9 @@ func (c *ResourceClient) WaitForNodeGroups(
 				// so condition is met
 				continue
 			}
+			if nodeGroup.Status == types.NodegroupStatusCreateFailed {
+				return fmt.Errorf("failed to create node group %s: %w", nodeGroupName, err)
+			}
 			allConditionsMet = false
 			break
 		}
@@ -163,7 +166,7 @@ func (c *ResourceClient) WaitForNodeGroups(
 		if allConditionsMet {
 			break
 		}
-		time.Sleep(time.Second * 15)
+		time.Sleep(time.Second * NodeGroupCheckInterval)
 	}
 
 	return nil
