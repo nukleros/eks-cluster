@@ -56,7 +56,7 @@ func (c *ResourceClient) CreateVPC(
 	}
 	_, err = svc.ModifyVpcAttribute(c.Context, &modifyVPCAttributeDNSHostnamesInput)
 	if err != nil {
-		return resp.Vpc, fmt.Errorf("failed to modify VPC attribute to enable DNS hostnames for VPC with ID %s: %w",
+		return resp.Vpc, fmt.Errorf("failed to modify VPC attribute to enable DNS hostnames for VPC with ID %d: %w",
 			resp.Vpc.VpcId, err)
 	}
 	modifyVPCAttributeDNSSupportInput := ec2.ModifyVpcAttributeInput{
@@ -65,7 +65,7 @@ func (c *ResourceClient) CreateVPC(
 	}
 	_, err = svc.ModifyVpcAttribute(c.Context, &modifyVPCAttributeDNSSupportInput)
 	if err != nil {
-		return resp.Vpc, fmt.Errorf("failed to modify VPC attribute to enable DNS support for VPC with ID %s: %w",
+		return resp.Vpc, fmt.Errorf("failed to modify VPC attribute to enable DNS support for VPC with ID %d: %w",
 			resp.Vpc.VpcId, err)
 	}
 

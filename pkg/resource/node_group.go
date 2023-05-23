@@ -151,7 +151,7 @@ func (c *ResourceClient) WaitForNodeGroups(
 				continue
 			}
 			if nodeGroup.Status == types.NodegroupStatusCreateFailed {
-				return fmt.Errorf("failed to create node group %s. Issues with node group: ", nodeGroupName, getHealthIssues(nodeGroupHealth))
+				return fmt.Errorf("failed to create node group %s. Issues with node group: %s", nodeGroupName, getHealthIssues(nodeGroupHealth))
 			}
 			allConditionsMet = false
 			break

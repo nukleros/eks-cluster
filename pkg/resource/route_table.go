@@ -81,7 +81,7 @@ func (c *ResourceClient) CreateRouteTables(
 		_, err = svc.AssociateRouteTable(c.Context, &associatePrivateRouteTableInput)
 		if err != nil {
 			return &privateRouteTables, &publicRouteTable, fmt.Errorf(
-				"failed to associate private route table with ID %s to subnet with ID %s: %w",
+				"failed to associate private route table with ID %d to subnet with ID %s: %w",
 				privateResp.RouteTable.RouteTableId, az.PrivateSubnetID, err)
 		}
 
@@ -107,7 +107,7 @@ func (c *ResourceClient) CreateRouteTables(
 		_, err = svc.AssociateRouteTable(c.Context, &associatePublicRouteTableInput)
 		if err != nil {
 			return &privateRouteTables, &publicRouteTable, fmt.Errorf(
-				"failed to associate public route table with ID %s to subnet with ID %s: %w",
+				"failed to associate public route table with ID %d to subnet with ID %s: %w",
 				publicRouteTable.RouteTableId, az.PublicSubnetID, err)
 		}
 	}
