@@ -4,7 +4,6 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -57,13 +56,4 @@ func init() {
 		"The AWS config profile to draw credentials from when provisioning resources")
 	rootCmd.PersistentFlags().BoolVarP(&awsConfigEnv, "aws-config-env", "e", false,
 		"Retrieve credentials from environment variables")
-}
-
-// outputMessages prints the output messages from the resource client to the
-// terminal for the CLI user.
-func outputMessages(msgChan *chan string) {
-	for {
-		msg := <-*msgChan
-		fmt.Println(msg)
-	}
 }
