@@ -14,7 +14,14 @@ var deleteCmd = &cobra.Command{
 	Short: "Remove an EKS cluster from AWS",
 	Long:  `Remove an EKS cluster from AWS.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := api.Delete(awsConfigEnv, awsConfigProfile, inventoryFile)
+
+		// Create resource client
+		resourceClient, err := api.CreateResourceClient(awsConfigEnv, awsConfigProfile)
+		if err != nil {
+			return err
+		}
+
+		err = api.Delete(resourceClient, inventoryFile)
 		if err != nil {
 			return err
 		}

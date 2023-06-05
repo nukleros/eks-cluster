@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/nukleros/eks-cluster/pkg/resource"
 	"gopkg.in/yaml.v2"
@@ -17,7 +14,8 @@ var (
 	configFile string
 )
 
-func Create(awsConfigEnv bool, awsConfigProfile, inventoryFile string) error {
+// Create creates an EKS cluster
+func Create(resourceClient *resource.ResourceClient, inventoryFile string) error {
 	// load config
 	resourceConfig := resource.NewResourceConfig()
 	if configFile != "" {
@@ -30,39 +28,9 @@ func Create(awsConfigEnv bool, awsConfigProfile, inventoryFile string) error {
 		}
 	}
 
-	// create resource client - region is not passed since it can be set in
-	// the config file if needed
-	awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "")
-	if err != nil {
-		return err
-	}
-	msgChan := make(chan string)
-	go outputMessages(&msgChan)
-	ctx := context.Background()
-	resourceClient := resource.ResourceClient{&msgChan, ctx, awsConfig}
-
-	// Create a channel to receive OS signals
-	sigs := make(chan os.Signal, 1)
-
-	// Register the channel to receive SIGINT signals
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-	// Run a goroutine to handle the signal. It will block until it receives a signal
-	go func() {
-		<-sigs
-		fmt.Println("\nReceived Ctrl+C, cleaning up resources...")
-		if err = resourceClient.DeleteResourceStack(inventoryFile); err != nil {
-			fmt.Errorf("\nError deleting resources: %s", err)
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}()
-
-	fmt.Println("Running... Press Ctrl+C to exit")
-
 	// create resources
 	fmt.Println("Creating resources for EKS cluster...")
-	err = resourceClient.CreateResourceStack(inventoryFile, resourceConfig)
+	err := resourceClient.CreateResourceStack(inventoryFile, resourceConfig)
 	if err != nil {
 		fmt.Println("Problem encountered creating resources - deleting resources that were created: %w", err)
 		if deleteErr := resourceClient.DeleteResourceStack(inventoryFile); deleteErr != nil {
@@ -77,7 +45,8 @@ func Create(awsConfigEnv bool, awsConfigProfile, inventoryFile string) error {
 	return nil
 }
 
-func Delete(awsConfigEnv bool, awsConfigProfile, inventoryFile string) error {
+// Delete deletes an EKS cluster
+func Delete(resourceClient *resource.ResourceClient, inventoryFile string) error {
 	// load inventory
 	var resourceInventory resource.ResourceInventory
 	if inventoryFile != "" {
@@ -87,16 +56,6 @@ func Delete(awsConfigEnv bool, awsConfigProfile, inventoryFile string) error {
 		}
 		json.Unmarshal(inventoryJSON, &resourceInventory)
 	}
-
-	// create resource client
-	awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "")
-	if err != nil {
-		return err
-	}
-	msgChan := make(chan string)
-	go outputMessages(&msgChan)
-	ctx := context.Background()
-	resourceClient := resource.ResourceClient{&msgChan, ctx, awsConfig}
 
 	// delete resources
 	fmt.Println("Deleting resources for EKS cluster...")
@@ -114,6 +73,21 @@ func Delete(awsConfigEnv bool, awsConfigProfile, inventoryFile string) error {
 
 	fmt.Println("EKS cluster deleted")
 	return nil
+}
+
+// CreateResourceClient configures a resource client and returns it
+func CreateResourceClient(awsConfigEnv bool, awsConfigProfile string) (*resource.ResourceClient, error) {
+	// create resource client - region is not passed since it can be set in
+	// the config file if needed
+	awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "")
+	if err != nil {
+		return nil, err
+	}
+	msgChan := make(chan string)
+	go outputMessages(&msgChan)
+	ctx := context.Background()
+	resourceClient := resource.ResourceClient{&msgChan, ctx, awsConfig}
+	return &resourceClient, nil
 }
 
 // outputMessages prints the output messages from the resource client to the

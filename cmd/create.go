@@ -4,6 +4,11 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/spf13/cobra"
 
 	"github.com/nukleros/eks-cluster/pkg/api"
@@ -19,7 +24,33 @@ var createCmd = &cobra.Command{
 	Short: "Provision an EKS cluster in AWS",
 	Long:  `Provision an EKS cluster in AWS.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := api.Create(awsConfigEnv, awsConfigProfile, inventoryFile)
+
+		// Create resource client
+		resourceClient, err := api.CreateResourceClient(awsConfigEnv, awsConfigProfile)
+		if err != nil {
+			return err
+		}
+
+		// Create a channel to receive OS signals
+		sigs := make(chan os.Signal, 1)
+
+		// Register the channel to receive SIGINT signals
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+		// Run a goroutine to handle the signal. It will block until it receives a signal
+		go func() {
+			<-sigs
+			fmt.Println("\nReceived Ctrl+C, cleaning up resources...")
+			if err = resourceClient.DeleteResourceStack(inventoryFile); err != nil {
+				fmt.Errorf("\nError deleting resources: %s", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+		}()
+
+		fmt.Println("Running... Press Ctrl+C to exit")
+
+		err = api.Create(resourceClient, inventoryFile)
 		if err != nil {
 			return err
 		}
