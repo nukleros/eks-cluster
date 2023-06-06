@@ -7,26 +7,15 @@ import (
 	"io/ioutil"
 
 	"github.com/nukleros/eks-cluster/pkg/resource"
-	"gopkg.in/yaml.v2"
 )
 
 var (
 	configFile string
 )
 
-// Create creates an EKS cluster
-func Create(resourceClient *resource.ResourceClient, inventoryFile string) error {
-	// load config
-	resourceConfig := resource.NewResourceConfig()
-	if configFile != "" {
-		configYAML, err := ioutil.ReadFile(configFile)
-		if err != nil {
-			return err
-		}
-		if err := yaml.Unmarshal(configYAML, &resourceConfig); err != nil {
-			return err
-		}
-	}
+// Create creates an EKS cluster, writes the inventory file, and cleans up resources in
+// the event of a failure
+func Create(resourceClient *resource.ResourceClient, resourceConfig *resource.ResourceConfig, inventoryFile string) error {
 
 	// create resources
 	fmt.Println("Creating resources for EKS cluster...")

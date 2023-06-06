@@ -5,13 +5,16 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
 
 	"github.com/nukleros/eks-cluster/pkg/api"
+	"github.com/nukleros/eks-cluster/pkg/resource"
 )
 
 var (
@@ -29,6 +32,18 @@ var createCmd = &cobra.Command{
 		resourceClient, err := api.CreateResourceClient(awsConfigEnv, awsConfigProfile)
 		if err != nil {
 			return err
+		}
+
+		// load config
+		resourceConfig := resource.NewResourceConfig()
+		if configFile != "" {
+			configYAML, err := ioutil.ReadFile(configFile)
+			if err != nil {
+				return err
+			}
+			if err := yaml.Unmarshal(configYAML, &resourceConfig); err != nil {
+				return err
+			}
 		}
 
 		// Create a channel to receive OS signals
@@ -50,7 +65,7 @@ var createCmd = &cobra.Command{
 
 		fmt.Println("Running... Press Ctrl+C to exit")
 
-		err = api.Create(resourceClient, inventoryFile)
+		err = api.Create(resourceClient, resourceConfig, inventoryFile)
 		if err != nil {
 			return err
 		}
