@@ -14,7 +14,7 @@ var (
 )
 
 // Create creates an EKS cluster, writes the inventory file, and cleans up resources in
-// the event of a failure
+// the event of a failure.
 func Create(resourceClient *resource.ResourceClient, resourceConfig *resource.ResourceConfig, inventoryFile string) error {
 
 	// create resources
@@ -34,7 +34,7 @@ func Create(resourceClient *resource.ResourceClient, resourceConfig *resource.Re
 	return nil
 }
 
-// Delete deletes an EKS cluster
+// Delete deletes an EKS cluster.
 func Delete(resourceClient *resource.ResourceClient, inventoryFile string) error {
 	// load inventory
 	var resourceInventory resource.ResourceInventory
@@ -64,7 +64,7 @@ func Delete(resourceClient *resource.ResourceClient, inventoryFile string) error
 	return nil
 }
 
-// CreateResourceClient configures a resource client and returns it
+// CreateResourceClient configures a resource client and returns it.
 func CreateResourceClient(awsConfigEnv bool, awsConfigProfile string) (*resource.ResourceClient, error) {
 	// create resource client - region is not passed since it can be set in
 	// the config file if needed

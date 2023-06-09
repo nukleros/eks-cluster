@@ -28,7 +28,7 @@ var createCmd = &cobra.Command{
 	Long:  `Provision an EKS cluster in AWS.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// Create resource client
+		// create resource client
 		resourceClient, err := api.CreateResourceClient(awsConfigEnv, awsConfigProfile)
 		if err != nil {
 			return err
