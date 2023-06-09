@@ -10,7 +10,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/iam v1.19.0
 	github.com/aws/smithy-go v1.13.5
 	github.com/spf13/cobra v1.6.1
-	gopkg.in/yaml.v2 v2.2.8
 	gopkg.in/yaml.v3 v3.0.1
 )
 

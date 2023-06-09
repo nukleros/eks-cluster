@@ -11,7 +11,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/nukleros/eks-cluster/pkg/api"
 	"github.com/nukleros/eks-cluster/pkg/resource"
