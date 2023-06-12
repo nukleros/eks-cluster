@@ -21,7 +21,7 @@ var (
 	configFile string
 )
 
-// createCmd represents the create command
+// createCmd represents the create command.
 var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Provision an EKS cluster in AWS",
@@ -46,13 +46,13 @@ var createCmd = &cobra.Command{
 			}
 		}
 
-		// Create a channel to receive OS signals
+		// create a channel to receive OS signals
 		sigs := make(chan os.Signal, 1)
 
-		// Register the channel to receive SIGINT signals
+		// register the channel to receive SIGINT signals
 		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-		// Run a goroutine to handle the signal. It will block until it receives a signal
+		// run a goroutine to handle the signal. It will block until it receives a signal
 		go func() {
 			<-sigs
 			fmt.Println("\nReceived Ctrl+C, cleaning up resources...")
