@@ -4,6 +4,8 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"os"
+
 	"github.com/nukleros/eks-cluster/pkg/api"
 	"github.com/spf13/cobra"
 )
@@ -23,6 +25,11 @@ var deleteCmd = &cobra.Command{
 
 		err = api.Delete(resourceClient, inventoryFile)
 		if err != nil {
+			return err
+		}
+
+		// remove inventory file from filesystem
+		if err := os.Remove(inventoryFile); err != nil {
 			return err
 		}
 		return nil
