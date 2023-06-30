@@ -30,11 +30,6 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 		resourceConfig.Region = c.AWSConfig.Region
 	}
 
-	err := WriteInventory(inventoryFile, &inventory)
-	if err != nil {
-		return err
-	}
-
 	// Tags
 	ec2Tags := CreateEC2Tags(resourceConfig.Name, resourceConfig.Tags)
 	iamTags := CreateIAMTags(resourceConfig.Name, resourceConfig.Tags)
@@ -51,9 +46,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 	vpc, err := c.CreateVPC(ec2Tags, resourceConfig.ClusterCIDR, resourceConfig.Name)
 	if vpc != nil {
 		inventory.VPCID = *vpc.VpcId
-		errWrite = WriteInventory(inventoryFile, &inventory)
-		if errWrite != nil {
-			return err
+		if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+			return errWrite
 		}
 	}
 	if err != nil {
@@ -67,9 +61,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 	igw, err := c.CreateInternetGateway(ec2Tags, *vpc.VpcId, resourceConfig.Name)
 	if igw != nil {
 		inventory.InternetGatewayID = *igw.InternetGatewayId
-		errWrite = WriteInventory(inventoryFile, &inventory)
-		if errWrite != nil {
-			return err
+		if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+			return errWrite
 		}
 	}
 	if err != nil {
@@ -97,9 +90,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 		}
 	}
 	inventory.SubnetIDs = allSubnetIDs
-	errWrite = WriteInventory(inventoryFile, &inventory)
-	if errWrite != nil {
-		return err
+	if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+		return errWrite
 	}
 	if err != nil {
 		return err
@@ -111,9 +103,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 	// Elastic IPs
 	elasticIPIDs, err := c.CreateElasticIPs(ec2Tags, publicSubnetIDs)
 	inventory.ElasticIPIDs = elasticIPIDs
-	errWrite = WriteInventory(inventoryFile, &inventory)
-	if errWrite != nil {
-		return err
+	if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+		return errWrite
 	}
 	if err != nil {
 		return err
@@ -150,15 +141,13 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 		}
 	}
 	inventory.PrivateRouteTableIDs = privateRouteTableIDs
-	errWrite = WriteInventory(inventoryFile, &inventory)
-	if errWrite != nil {
-		return err
+	if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+		return errWrite
 	}
 	if publicRouteTable != nil {
 		inventory.PublicRouteTableID = *publicRouteTable.RouteTableId
-		errWrite = WriteInventory(inventoryFile, &inventory)
-		if errWrite != nil {
-			return err
+		if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+			return errWrite
 		}
 	}
 	if err != nil {
@@ -176,9 +165,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 		dnsPolicy, err := c.CreateDNSManagementPolicy(iamTags, resourceConfig.Name)
 		if dnsPolicy != nil {
 			inventory.PolicyARNs = append(inventory.PolicyARNs, *dnsPolicy.Arn)
-			errWrite = WriteInventory(inventoryFile, &inventory)
-			if errWrite != nil {
-				return err
+			if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+				return errWrite
 			}
 		}
 		if err != nil {
@@ -196,9 +184,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 		clusterAutoscalingPolicy, err := c.CreateClusterAutoscalingPolicy(iamTags, resourceConfig.Name)
 		if clusterAutoscalingPolicy != nil {
 			inventory.PolicyARNs = append(inventory.PolicyARNs, *clusterAutoscalingPolicy.Arn)
-			errWrite = WriteInventory(inventoryFile, &inventory)
-			if errWrite != nil {
-				return err
+			if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+				return errWrite
 			}
 		}
 		if err != nil {
@@ -239,9 +226,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 	if cluster != nil {
 		inventory.Cluster.ClusterName = *cluster.Name
 		inventory.Cluster.ClusterARN = *cluster.Arn
-		errWrite = WriteInventory(inventoryFile, &inventory)
-		if errWrite != nil {
-			return err
+		if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+			return errWrite
 		}
 	}
 	if err != nil {
@@ -272,9 +258,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 			nodeGroupNames = append(nodeGroupNames, *nodeGroup.NodegroupName)
 		}
 		inventory.NodeGroupNames = nodeGroupNames
-		errWrite = WriteInventory(inventoryFile, &inventory)
-		if errWrite != nil {
-			return err
+		if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+			return errWrite
 		}
 	}
 	if err != nil {
@@ -321,9 +306,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 				RoleARN:        *dnsManagementRole.Arn,
 				RolePolicyARNs: []string{*createdDNSPolicy.Arn},
 			}
-			errWrite = WriteInventory(inventoryFile, &inventory)
-			if errWrite != nil {
-				return err
+			if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+				return errWrite
 			}
 		}
 		if err != nil {
@@ -345,9 +329,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 				RoleARN:        *clusterAutoscalingRole.Arn,
 				RolePolicyARNs: []string{*clusterAutoscalingRole.PermissionsBoundary.PermissionsBoundaryArn},
 			}
-			errWrite = WriteInventory(inventoryFile, &inventory)
-			if errWrite != nil {
-				return err
+			if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+				return errWrite
 			}
 		}
 		if err != nil {
@@ -364,9 +347,8 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 			RoleARN:        *storageManagementRole.Arn,
 			RolePolicyARNs: []string{*storageManagementRole.PermissionsBoundary.PermissionsBoundaryArn},
 		}
-		errWrite = WriteInventory(inventoryFile, &inventory)
-		if errWrite != nil {
-			return err
+		if errWrite = WriteInventory(inventoryFile, &inventory); errWrite != nil {
+			return errWrite
 		}
 	}
 	if err != nil {
@@ -388,131 +370,163 @@ func (c *ResourceClient) CreateResourceStack(inventoryFile string, resourceConfi
 // DeleteResourceStack deletes all the resources in the resource inventory.
 func (c *ResourceClient) DeleteResourceStack(inventoryFile string) error {
 
-	resourceInv, err := ReadInventory(inventoryFile)
+	inventory, err := ReadInventory(inventoryFile)
 	if err != nil {
 		return err
 	}
 
-	c.AWSConfig.Region = resourceInv.Region
+	c.AWSConfig.Region = inventory.Region
+
+	var errWrite error
 
 	// OIDC Provider
-	if err := c.DeleteOIDCProvider(resourceInv.OIDCProviderARN); err != nil {
+	if err := c.DeleteOIDCProvider(inventory.OIDCProviderARN); err != nil {
 		return err
 	}
+	if errWrite = WriteInventory(inventoryFile, inventory); errWrite != nil {
+		return errWrite
+	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("OIDC provider deleted: %s\n", resourceInv.OIDCProviderARN)
+		*c.MessageChan <- fmt.Sprintf("OIDC provider deleted: %s\n", inventory.OIDCProviderARN)
 	}
 
 	// Node Groups
-	if err := c.DeleteNodeGroups(resourceInv.Cluster.ClusterName, resourceInv.NodeGroupNames); err != nil {
+	if err := c.DeleteNodeGroups(inventory.Cluster.ClusterName, inventory.NodeGroupNames); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("Node groups deletion initiated: %s\n", resourceInv.NodeGroupNames)
-		*c.MessageChan <- fmt.Sprintf("Waiting for node groups to be deleted: %s\n", resourceInv.NodeGroupNames)
+		*c.MessageChan <- fmt.Sprintf("Node groups deletion initiated: %s\n", inventory.NodeGroupNames)
+		*c.MessageChan <- fmt.Sprintf("Waiting for node groups to be deleted: %s\n", inventory.NodeGroupNames)
 	}
-	if err := c.WaitForNodeGroups(resourceInv.Cluster.ClusterName, resourceInv.NodeGroupNames, NodeGroupConditionDeleted); err != nil {
+	if err := c.WaitForNodeGroups(inventory.Cluster.ClusterName, inventory.NodeGroupNames, NodeGroupConditionDeleted); err != nil {
 		return err
 	}
+	if errWrite = WriteInventory(inventoryFile, inventory); errWrite != nil {
+		return errWrite
+	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("Node groups deletion complete: %s\n", resourceInv.NodeGroupNames)
+		*c.MessageChan <- fmt.Sprintf("Node groups deletion complete: %s\n", inventory.NodeGroupNames)
 	}
 
 	// EKS Cluster
-	if err := c.DeleteCluster(resourceInv.Cluster.ClusterName); err != nil {
+	if err := c.DeleteCluster(inventory.Cluster.ClusterName); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion initiated: %s\n", resourceInv.Cluster.ClusterName)
-		*c.MessageChan <- fmt.Sprintf("Waiting for EKS cluster to be deleted: %s\n", resourceInv.Cluster.ClusterName)
+		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion initiated: %s\n", inventory.Cluster.ClusterName)
+		*c.MessageChan <- fmt.Sprintf("Waiting for EKS cluster to be deleted: %s\n", inventory.Cluster.ClusterName)
 	}
-	if _, err := c.WaitForCluster(resourceInv.Cluster.ClusterName, ClusterConditionDeleted); err != nil {
+	if _, err := c.WaitForCluster(inventory.Cluster.ClusterName, ClusterConditionDeleted); err != nil {
 		return err
 	}
+	if errWrite := WriteInventory(inventoryFile, inventory); errWrite != nil {
+		return errWrite
+	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion complete: %s\n", resourceInv.Cluster.ClusterName)
+		*c.MessageChan <- fmt.Sprintf("EKS cluster deletion complete: %s\n", inventory.Cluster.ClusterName)
 	}
 
 	// IAM Roles
 	iamRoles := []RoleInventory{
-		resourceInv.ClusterRole,
-		resourceInv.WorkerRole,
-		resourceInv.DNSManagementRole,
-		resourceInv.ClusterAutoscalingRole,
-		resourceInv.StorageManagementRole,
+		inventory.ClusterRole,
+		inventory.WorkerRole,
+		inventory.DNSManagementRole,
+		inventory.ClusterAutoscalingRole,
+		inventory.StorageManagementRole,
 	}
 	if err := c.DeleteRoles(&iamRoles); err != nil {
 		return err
+	}
+	if errWrite = WriteInventory(inventoryFile, inventory); errWrite != nil {
+		return errWrite
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("IAM roles deleted: %s\n", iamRoles)
 	}
 
 	// IAM Policies
-	if err := c.DeletePolicies(resourceInv.PolicyARNs); err != nil {
+	if err := c.DeletePolicies(inventory.PolicyARNs); err != nil {
 		return err
 	}
+	if errWrite = WriteInventory(inventoryFile, inventory); errWrite != nil {
+		return errWrite
+	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("IAM policies deleted: %s\n", resourceInv.PolicyARNs)
+		*c.MessageChan <- fmt.Sprintf("IAM policies deleted: %s\n", inventory.PolicyARNs)
 	}
 
 	// NAT Gateways
-	if err := c.DeleteNATGateways(resourceInv.VPCID); err != nil {
+	if err := c.DeleteNATGateways(inventory.VPCID); err != nil {
 		return err
 	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("NAT gateways deleted for VPC with ID: %s\n", resourceInv.VPCID)
+		*c.MessageChan <- fmt.Sprintf("NAT gateways deletion initiated for VPC with ID: %s\n", inventory.VPCID)
+		*c.MessageChan <- fmt.Sprintf("Waiting for NAT gateways to be deleted for VPC with ID: %s\n", inventory.VPCID)
 	}
-	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("NAT gateways deletion initiated for VPC with ID: %s\n", resourceInv.VPCID)
-		*c.MessageChan <- fmt.Sprintf("Waiting for NAT gateways to be deleted for VPC with ID: %s\n", resourceInv.VPCID)
-	}
-	if err := c.WaitForNATGateways(resourceInv.VPCID, nil, NATGatewayConditionDeleted); err != nil {
+	if err := c.WaitForNATGateways(inventory.VPCID, nil, NATGatewayConditionDeleted); err != nil {
 		return err
 	}
+	if errWrite = WriteInventory(inventoryFile, inventory); errWrite != nil {
+		return errWrite
+	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("NAT gateway deletion complete for VPC with ID: %s\n", resourceInv.VPCID)
+		*c.MessageChan <- fmt.Sprintf("NAT gateway deletion complete for VPC with ID: %s\n", inventory.VPCID)
 	}
 
 	// Internet Gateway
-	if err := c.DeleteInternetGateway(resourceInv.InternetGatewayID, resourceInv.VPCID); err != nil {
+	if err := c.DeleteInternetGateway(inventory.InternetGatewayID, inventory.VPCID); err != nil {
 		return err
 	}
+	if errWrite = WriteInventory(inventoryFile, inventory); errWrite != nil {
+		return errWrite
+	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("Internet gateway deleted: %s\n", resourceInv.InternetGatewayID)
+		*c.MessageChan <- fmt.Sprintf("Internet gateway deleted: %s\n", inventory.InternetGatewayID)
 	}
 
 	// Elastic IPs
-	if err := c.DeleteElasticIPs(resourceInv.ElasticIPIDs); err != nil {
+	if err := c.DeleteElasticIPs(inventory.ElasticIPIDs); err != nil {
 		return err
 	}
+	if errWrite = WriteInventory(inventoryFile, inventory); errWrite != nil {
+		return errWrite
+	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("Elastic IPs deleted: %s\n", resourceInv.ElasticIPIDs)
+		*c.MessageChan <- fmt.Sprintf("Elastic IPs deleted: %s\n", inventory.ElasticIPIDs)
 	}
 
 	// Subnets
-	if err := c.DeleteSubnets(resourceInv.SubnetIDs); err != nil {
+	if err := c.DeleteSubnets(inventory.SubnetIDs); err != nil {
 		return err
 	}
+	if errWrite = WriteInventory(inventoryFile, inventory); errWrite != nil {
+		return errWrite
+	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("Subnets deleted: %s\n", resourceInv.SubnetIDs)
+		*c.MessageChan <- fmt.Sprintf("Subnets deleted: %s\n", inventory.SubnetIDs)
 	}
 
 	// Route Tables
-	if err := c.DeleteRouteTables(resourceInv.PrivateRouteTableIDs, resourceInv.PublicRouteTableID); err != nil {
+	if err := c.DeleteRouteTables(inventory.PrivateRouteTableIDs, inventory.PublicRouteTableID); err != nil {
 		return err
+	}
+	if errWrite = WriteInventory(inventoryFile, inventory); errWrite != nil {
+		return errWrite
 	}
 	if c.MessageChan != nil {
 		*c.MessageChan <- fmt.Sprintf("Route tables deleted: [%s %s]\n",
-			resourceInv.PrivateRouteTableIDs, resourceInv.PublicRouteTableID)
+			inventory.PrivateRouteTableIDs, inventory.PublicRouteTableID)
 	}
 
 	// VPC
-	if err := c.DeleteVPC(resourceInv.VPCID); err != nil {
+	if err := c.DeleteVPC(inventory.VPCID); err != nil {
 		return err
 	}
+	if errWrite = WriteInventory(inventoryFile, inventory); errWrite != nil {
+		return errWrite
+	}
 	if c.MessageChan != nil {
-		*c.MessageChan <- fmt.Sprintf("VPC deleted: %s\n", resourceInv.VPCID)
+		*c.MessageChan <- fmt.Sprintf("VPC deleted: %s\n", inventory.VPCID)
 	}
 
 	return nil
