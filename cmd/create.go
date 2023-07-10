@@ -13,12 +13,12 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/nukleros/eks-cluster/pkg/api"
 	"github.com/nukleros/eks-cluster/pkg/resource"
 )
 
 var (
-	configFile string
+	configFile          string
+	createInventoryFile string
 )
 
 // createCmd represents the create command.
@@ -27,48 +27,85 @@ var createCmd = &cobra.Command{
 	Short: "Provision an EKS cluster in AWS",
 	Long:  `Provision an EKS cluster in AWS.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		// create resource client
-		resourceClient, err := api.CreateResourceClient(awsConfigEnv, awsConfigProfile)
+		// load AWS config
+		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "")
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to load AWS config: %w", err)
 		}
 
-		// load config
+		// create resource client
+		resourceClient := resource.CreateResourceClient(awsConfig)
+
+		// load config resource config
 		resourceConfig := resource.NewResourceConfig()
 		if configFile != "" {
 			configYAML, err := ioutil.ReadFile(configFile)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to load resource config: %w", err)
 			}
 			if err := yaml.Unmarshal(configYAML, &resourceConfig); err != nil {
-				return err
+				return fmt.Errorf("failed unmarshal yaml from resource config: %w", err)
 			}
 		}
 
-		// create a channel to receive OS signals
+		// capture messages as resources are created and return to user
+		go func() {
+			for msg := range *resourceClient.MessageChan {
+				fmt.Println(msg)
+			}
+		}()
+
+		// capture inventory and write to file as it is created
+		go func() {
+			for inventory := range *resourceClient.InventoryChan {
+				if err := writeInventory(createInventoryFile, &inventory); err != nil {
+					fmt.Printf("failed to write inventory file: %s", err)
+				}
+			}
+		}()
+
+		// delete inventory if interrupted
 		sigs := make(chan os.Signal, 1)
-
-		// register the channel to receive SIGINT signals
 		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-		// run a goroutine to handle the signal. It will block until it receives a signal
 		go func() {
 			<-sigs
 			fmt.Println("\nReceived Ctrl+C, cleaning up resources...")
-			if err = resourceClient.DeleteResourceStack(inventoryFile); err != nil {
-				fmt.Errorf("\nError deleting resources: %s", err)
-				os.Exit(1)
+			inventory, err := readInventory(createInventoryFile)
+			if err != nil {
+				fmt.Printf("failed to read eks cluster inventory: %s\n", err)
 			}
-			os.Exit(0)
+			if err = resourceClient.DeleteResourceStack(inventory); err != nil {
+				fmt.Printf("failed to delete eks cluster resources: %s\n", err)
+			}
 		}()
 
 		fmt.Println("Running... Press Ctrl+C to exit")
 
-		err = api.Create(resourceClient, resourceConfig, inventoryFile)
-		if err != nil {
-			return err
+		// create resources
+		fmt.Println("Creating resources for EKS cluster...")
+		if err := resourceClient.CreateResourceStack(resourceConfig); err != nil {
+			fmt.Printf("Problem encountered creating resources - deleting resources that were created: %s\n", err)
+			// get inventory
+			inventory, invErr := readInventory(createInventoryFile)
+			if invErr != nil {
+				return fmt.Errorf("Error creating resources: %w\nError reading eks cluster inventory: %w", err, invErr)
+			}
+			// delete resource stack
+			if deleteErr := resourceClient.DeleteResourceStack(inventory); deleteErr != nil {
+				return fmt.Errorf("Error creating resources: %w\nError deleting resources: %s", err, deleteErr)
+			}
+			// remove inventory file from filesystem
+			if err := os.Remove(deleteInventoryFile); err != nil {
+				return err
+			}
+
+			return fmt.Errorf("failed to create resource stack for eks cluster: %w", err)
 		}
+
+		fmt.Printf("Inventory file '%s' written\n", createInventoryFile)
+
+		fmt.Println("EKS cluster created")
+
 		return nil
 	},
 }
@@ -76,8 +113,13 @@ var createCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(createCmd)
 
-	createCmd.Flags().StringVarP(&configFile, "config-file", "c", "",
-		"File to read EKS cluster config from")
-	createCmd.Flags().StringVarP(&inventoryFile, "inventory-file", "i",
-		"eks-cluster-inventory.json", "File to write resource inventory to")
+	createCmd.Flags().StringVarP(
+		&configFile, "config-file", "c", "",
+		"File to read EKS cluster config from",
+	)
+	createCmd.MarkFlagRequired("config-file")
+	createCmd.Flags().StringVarP(
+		&createInventoryFile, "inventory-file", "i", "eks-cluster-inventory.json",
+		"File to write resource inventory to",
+	)
 }
