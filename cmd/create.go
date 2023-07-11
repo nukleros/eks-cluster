@@ -58,7 +58,7 @@ var createCmd = &cobra.Command{
 		// capture inventory and write to file as it is created
 		go func() {
 			for inventory := range *resourceClient.InventoryChan {
-				if err := writeInventory(createInventoryFile, &inventory); err != nil {
+				if err := resource.WriteInventory(createInventoryFile, &inventory); err != nil {
 					fmt.Printf("failed to write inventory file: %s", err)
 				}
 			}
@@ -70,7 +70,7 @@ var createCmd = &cobra.Command{
 		go func() {
 			<-sigs
 			fmt.Println("\nReceived Ctrl+C, cleaning up resources...")
-			inventory, err := readInventory(createInventoryFile)
+			inventory, err := resource.ReadInventory(createInventoryFile)
 			if err != nil {
 				fmt.Printf("failed to read eks cluster inventory: %s\n", err)
 			}
@@ -86,7 +86,7 @@ var createCmd = &cobra.Command{
 		if err := resourceClient.CreateResourceStack(resourceConfig); err != nil {
 			fmt.Printf("Problem encountered creating resources - deleting resources that were created: %s\n", err)
 			// get inventory
-			inventory, invErr := readInventory(createInventoryFile)
+			inventory, invErr := resource.ReadInventory(createInventoryFile)
 			if invErr != nil {
 				return fmt.Errorf("Error creating resources: %w\nError reading eks cluster inventory: %w", err, invErr)
 			}

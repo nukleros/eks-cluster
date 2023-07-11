@@ -39,14 +39,14 @@ var deleteCmd = &cobra.Command{
 		// capture inventory and write to file as resources are deleted
 		go func() {
 			for inventory := range *resourceClient.InventoryChan {
-				if err := writeInventory(deleteInventoryFile, &inventory); err != nil {
+				if err := resource.WriteInventory(deleteInventoryFile, &inventory); err != nil {
 					fmt.Printf("failed to write inventory file: %s", err)
 				}
 			}
 		}()
 
 		// load inventory
-		inventory, err := readInventory(deleteInventoryFile)
+		inventory, err := resource.ReadInventory(deleteInventoryFile)
 		if err != nil {
 			return fmt.Errorf("failed to read eks cluster inventory: %s\n", err)
 		}
