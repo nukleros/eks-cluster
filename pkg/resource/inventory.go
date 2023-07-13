@@ -58,7 +58,7 @@ func WriteInventory(inventoryFile string, inventory *ResourceInventory) error {
 	}
 
 	// write inventory file
-	inventoryJSON, err := json.MarshalIndent(inventory, "", "  ")
+	inventoryJSON, err := MarshalInventory(inventory)
 	if err != nil {
 		return err
 	}
@@ -77,10 +77,31 @@ func ReadInventory(inventoryFile string) (*ResourceInventory, error) {
 
 	// unmarshal JSON data
 	var inventory ResourceInventory
-	err = json.Unmarshal(inventoryBytes, &inventory)
-	if err != nil {
+	if err := UnmarshalInventory(inventoryBytes, &inventory); err != nil {
 		return nil, err
 	}
 
 	return &inventory, nil
+}
+
+// MarshalInventory returns a json representation of inventory from a
+// ResourceInventory object.
+func MarshalInventory(inventory *ResourceInventory) ([]byte, error) {
+	var inventoryJSON []byte
+	inventoryJSON, err := json.MarshalIndent(inventory, "", "  ")
+	if err != nil {
+		return inventoryJSON, err
+	}
+
+	return inventoryJSON, nil
+}
+
+// UnmarshalInventory unmarshalls an inventory as a JSON byte array into a
+// ResourceInventory object.
+func UnmarshalInventory(inventoryBytes []byte, inventory *ResourceInventory) error {
+	if err := json.Unmarshal(inventoryBytes, &inventory); err != nil {
+		return err
+	}
+
+	return nil
 }
