@@ -2,7 +2,9 @@ package resource
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
+	"os"
 )
 
 // ResourceInventory contains a record of all resources created so they can be
@@ -18,9 +20,9 @@ type ResourceInventory struct {
 	ClusterRole            RoleInventory    `json:"clusterRole"`
 	WorkerRole             RoleInventory    `json:"workerRole"`
 	DNSManagementRole      RoleInventory    `json:"dnsManagementRole"`
-	PolicyARNs             []string         `json:"policyARNs"`
 	StorageManagementRole  RoleInventory    `json:"storageManagementRole"`
 	ClusterAutoscalingRole RoleInventory    `json:"clusterAutoscalingRole"`
+	PolicyARNs             []string         `json:"policyARNs"`
 	Cluster                ClusterInventory `json:"cluster"`
 	NodeGroupNames         []string         `json:"nodeGroupNames"`
 	OIDCProviderARN        string           `json:"oidcProviderARN"`
@@ -40,9 +42,23 @@ type ClusterInventory struct {
 	OIDCProviderURL string `json:"oidcProviderURL"`
 }
 
+// WriteInventory writes the inventory to a file.
 func WriteInventory(inventoryFile string, inventory *ResourceInventory) error {
+	// create inventory file if not present
+	_, err := os.Stat(inventoryFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			_, err := os.Create(inventoryFile)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
 	// write inventory file
-	inventoryJSON, err := json.MarshalIndent(inventory, "", "  ")
+	inventoryJSON, err := MarshalInventory(inventory)
 	if err != nil {
 		return err
 	}
@@ -51,6 +67,7 @@ func WriteInventory(inventoryFile string, inventory *ResourceInventory) error {
 	return nil
 }
 
+// ReadInventory reads the inventory from the inventory file.
 func ReadInventory(inventoryFile string) (*ResourceInventory, error) {
 	// read inventory file
 	inventoryBytes, err := ioutil.ReadFile(inventoryFile)
@@ -60,10 +77,31 @@ func ReadInventory(inventoryFile string) (*ResourceInventory, error) {
 
 	// unmarshal JSON data
 	var inventory ResourceInventory
-	err = json.Unmarshal(inventoryBytes, &inventory)
-	if err != nil {
+	if err := UnmarshalInventory(inventoryBytes, &inventory); err != nil {
 		return nil, err
 	}
 
 	return &inventory, nil
+}
+
+// MarshalInventory returns a json representation of inventory from a
+// ResourceInventory object.
+func MarshalInventory(inventory *ResourceInventory) ([]byte, error) {
+	var inventoryJSON []byte
+	inventoryJSON, err := json.MarshalIndent(inventory, "", "  ")
+	if err != nil {
+		return inventoryJSON, err
+	}
+
+	return inventoryJSON, nil
+}
+
+// UnmarshalInventory unmarshalls an inventory as a JSON byte array into a
+// ResourceInventory object.
+func UnmarshalInventory(inventoryBytes []byte, inventory *ResourceInventory) error {
+	if err := json.Unmarshal(inventoryBytes, &inventory); err != nil {
+		return err
+	}
+
+	return nil
 }
