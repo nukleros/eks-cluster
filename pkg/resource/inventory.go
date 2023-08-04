@@ -2,7 +2,6 @@ package resource
 
 import (
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"os"
 )
@@ -44,25 +43,14 @@ type ClusterInventory struct {
 
 // WriteInventory writes the inventory to a file.
 func WriteInventory(inventoryFile string, inventory *ResourceInventory) error {
-	// create inventory file if not present
-	_, err := os.Stat(inventoryFile)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			_, err := os.Create(inventoryFile)
-			if err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	}
-
-	// write inventory file
 	inventoryJSON, err := MarshalInventory(inventory)
 	if err != nil {
 		return err
 	}
-	ioutil.WriteFile(inventoryFile, inventoryJSON, 0644)
+
+	if err := os.WriteFile(inventoryFile, inventoryJSON, 0644); err != nil {
+		return err
+	}
 
 	return nil
 }
