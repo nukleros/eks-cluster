@@ -140,6 +140,21 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) err
 		createdDNSPolicy = *dnsPolicy
 	}
 
+	// IAM Policy for DNS01 Challenge
+	var createdDNS01ChallengePolicy types.Policy
+	if resourceConfig.DNS01Challenge {
+		dns01ChallengePolicy, err := c.CreateDNS01ChallengePolicy(iamTags, resourceConfig.Name)
+		if dns01ChallengePolicy != nil {
+			inventory.PolicyARNs = append(inventory.PolicyARNs, *dns01ChallengePolicy.Arn)
+			c.sendInventory(&inventory)
+		}
+		if err != nil {
+			return err
+		}
+		c.sendMessage(fmt.Sprintf("IAM policy created: %s\n", *dns01ChallengePolicy.PolicyName))
+		createdDNS01ChallengePolicy = *dns01ChallengePolicy
+	}
+
 	// IAM Policy for Cluster Autoscaling
 	var createdClusterAutoscalingPolicy types.Policy
 	if resourceConfig.ClusterAutoscaling {
@@ -256,6 +271,28 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) err
 		c.sendMessage(fmt.Sprintf("IAM role for DNS management created: %s\n", *dnsManagementRole.RoleName))
 	}
 
+	// IAM Role for DNS01 Challenges
+	if resourceConfig.DNS01Challenge {
+		if createdDNS01ChallengePolicy.Arn == nil {
+			return errors.New("no DNS01 challenge policy ARN to attach to DNS challenge role")
+		}
+		dns01ChallengeRole, err := c.CreateDNS01ChallengeRole(iamTags, *createdDNS01ChallengePolicy.Arn,
+			resourceConfig.AWSAccountID, oidcIssuer, &resourceConfig.DNS01ChallengeServiceAccount,
+			resourceConfig.Name)
+		if dns01ChallengeRole != nil {
+			inventory.DNSManagementRole = RoleInventory{
+				RoleName:       *dns01ChallengeRole.RoleName,
+				RoleARN:        *dns01ChallengeRole.Arn,
+				RolePolicyARNs: []string{*createdDNSPolicy.Arn},
+			}
+			c.sendInventory(&inventory)
+		}
+		if err != nil {
+			return err
+		}
+		c.sendMessage(fmt.Sprintf("IAM role for DNS01 challenges created: %s\n", *dns01ChallengeRole.RoleName))
+	}
+
 	// IAM Role for Cluster Autoscaling
 	if resourceConfig.ClusterAutoscaling {
 		if createdClusterAutoscalingPolicy.Arn == nil {
@@ -349,6 +386,7 @@ func (c *ResourceClient) DeleteResourceStack(inventory *ResourceInventory) error
 		inventory.ClusterRole,
 		inventory.WorkerRole,
 		inventory.DNSManagementRole,
+		inventory.DNS01ChallengeRole,
 		inventory.ClusterAutoscalingRole,
 		inventory.StorageManagementRole,
 	}
@@ -359,6 +397,7 @@ func (c *ResourceClient) DeleteResourceStack(inventory *ResourceInventory) error
 	inventory.ClusterRole = RoleInventory{}
 	inventory.WorkerRole = RoleInventory{}
 	inventory.DNSManagementRole = RoleInventory{}
+	inventory.DNS01ChallengeRole = RoleInventory{}
 	inventory.ClusterAutoscalingRole = RoleInventory{}
 	inventory.StorageManagementRole = RoleInventory{}
 	c.sendInventory(inventory)

@@ -158,6 +158,62 @@ func (c *ResourceClient) CreateDNSManagementRole(
 	return dnsManagementRoleResp.Role, nil
 }
 
+// CreateDNS01ChallengeRole creates the IAM role needed for DNS01 challenges by
+// the Kubernetes service account of an in-cluster supporting service such as
+// cert-manager using IRSA (IAM role for service accounts).
+func (c *ResourceClient) CreateDNS01ChallengeRole(
+	tags *[]types.Tag,
+	dnsPolicyARN string,
+	awsAccountID string,
+	oidcProvider string,
+	serviceAccount *DNS01ChallengeServiceAccount,
+	clusterName string,
+) (*types.Role, error) {
+	svc := iam.NewFromConfig(*c.AWSConfig)
+
+	oidcProviderBare := strings.Trim(oidcProvider, "https://")
+	dns01ChallengeRoleName := fmt.Sprintf("%s-%s", DNSManagementRoleName, clusterName)
+	dns01ChallengeRolePolicyDocument := fmt.Sprintf(`{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": "arn:aws:iam::%[1]s:oidc-provider/%[2]s"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+                "StringEquals": {
+                    "%[2]s:sub": "system:serviceaccount:%[3]s:%[4]s",
+                    "%[2]s:aud": "sts.amazonaws.com"
+                }
+            }
+        }
+    ]
+}`, awsAccountID, oidcProviderBare, serviceAccount.Namespace, serviceAccount.Name)
+	createdDNS01ChallengeRoleInput := iam.CreateRoleInput{
+		AssumeRolePolicyDocument: &dns01ChallengeRolePolicyDocument,
+		RoleName:                 &dns01ChallengeRoleName,
+		PermissionsBoundary:      &dnsPolicyARN,
+		Tags:                     *tags,
+	}
+	dns01ChallengeRoleResp, err := svc.CreateRole(c.Context, &createdDNS01ChallengeRoleInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create role %s: %w", dns01ChallengeRoleName, err)
+	}
+
+	attachDNSManagementRolePolicyInput := iam.AttachRolePolicyInput{
+		PolicyArn: &dnsPolicyARN,
+		RoleName:  dns01ChallengeRoleResp.Role.RoleName,
+	}
+	_, err = svc.AttachRolePolicy(c.Context, &attachDNSManagementRolePolicyInput)
+	if err != nil {
+		return dns01ChallengeRoleResp.Role, fmt.Errorf("failed to attach role policy %s to %s: %w", dnsPolicyARN, dns01ChallengeRoleName, err)
+	}
+
+	return dns01ChallengeRoleResp.Role, nil
+}
+
 // CreateClusterAutoscalingRole creates the IAM role needed for cluster
 // autoscaler to manage node pool sizes using IRSA (IAM role for service
 // accounts).

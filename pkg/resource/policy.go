@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	DNSPolicyName         = "DNSUpdates"
-	AutoscalingPolicyName = "ClusterAutoscaler"
+	DNSPolicyName            = "DNSUpdates"
+	DNS01ChallengePolicyName = "DNS01Challenge"
+	AutoscalingPolicyName    = "ClusterAutoscaler"
 )
 
 // CreateDNSManagementPolicy creates the IAM policy to be used for managing
@@ -52,6 +53,52 @@ func (c *ResourceClient) CreateDNSManagementPolicy(tags *[]types.Tag, clusterNam
 	r53PolicyResp, err := svc.CreatePolicy(c.Context, &createR53PolicyInput)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create DNS management policy %s: %w", dnsPolicyName, err)
+	}
+
+	return r53PolicyResp.Policy, nil
+}
+
+// CreateDNS01ChallengePolicy creates the IAM policy to be used for completing
+// DNS01 challenges.
+func (c *ResourceClient) CreateDNS01ChallengePolicy(tags *[]types.Tag, clusterName string) (*types.Policy, error) {
+	svc := iam.NewFromConfig(*c.AWSConfig)
+
+	dnsPolicyName := fmt.Sprintf("%s-%s", DNS01ChallengePolicyName, clusterName)
+	dnsPolicyDescription := "Allow cluster services to complete DNS01 challenges"
+	dnsPolicyDocument := `{
+"Version": "2012-10-17",
+"Statement": [
+{
+  "Effect": "Allow",
+  "Action": [
+	"route53:ChangeResourceRecordSets",
+  ],
+  "Resource": [
+	"arn:aws:route53:::hostedzone/*"
+  ]
+},
+{
+  "Effect": "Allow",
+  "Action": [
+	"route53:GetChange",
+	"route53:ListHostedZones",
+	"route53:ListResourceRecordSets",
+	"route53:ListHostedZonesByName"
+],
+  "Resource": [
+	"*"
+  ]
+}
+]
+}`
+	createR53PolicyInput := iam.CreatePolicyInput{
+		PolicyName:     &dnsPolicyName,
+		Description:    &dnsPolicyDescription,
+		PolicyDocument: &dnsPolicyDocument,
+	}
+	r53PolicyResp, err := svc.CreatePolicy(c.Context, &createR53PolicyInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DNS01 challenge policy %s: %w", dnsPolicyName, err)
 	}
 
 	return r53PolicyResp.Policy, nil
