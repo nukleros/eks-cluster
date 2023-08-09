@@ -13,6 +13,7 @@ const (
 	ClusterRoleName            = "eks-cluster-role"
 	WorkerRoleName             = "eks-cluster-workler-role"
 	DNSManagementRoleName      = "eks-cluster-dns-management-role"
+	DNS01ChallengeRoleName     = "eks-cluster-dn01-challenge-role"
 	ClusterAutoscalingRoleName = "eks-cluster-cluster-autoscaler-role"
 	StorageManagementRoleName  = "eks-cluster-csi-driver-role"
 	ClusterPolicyARN           = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
@@ -172,7 +173,7 @@ func (c *ResourceClient) CreateDNS01ChallengeRole(
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
-	dns01ChallengeRoleName := fmt.Sprintf("%s-%s", DNSManagementRoleName, clusterName)
+	dns01ChallengeRoleName := fmt.Sprintf("%s-%s", DNS01ChallengeRoleName, clusterName)
 	dns01ChallengeRolePolicyDocument := fmt.Sprintf(`{
     "Version": "2012-10-17",
     "Statement": [

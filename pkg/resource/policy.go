@@ -76,7 +76,7 @@ func (c *ResourceClient) CreateDNS01ChallengePolicy(tags *[]types.Tag, clusterNa
 {
   "Effect": "Allow",
   "Action": [
-	"route53:ChangeResourceRecordSets",
+	"route53:ChangeResourceRecordSets"
   ],
   "Resource": [
 	"arn:aws:route53:::hostedzone/*"
@@ -89,7 +89,7 @@ func (c *ResourceClient) CreateDNS01ChallengePolicy(tags *[]types.Tag, clusterNa
 	"route53:ListHostedZones",
 	"route53:ListResourceRecordSets",
 	"route53:ListHostedZonesByName"
-],
+  ],
   "Resource": [
 	"*"
   ]
