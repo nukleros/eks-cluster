@@ -25,7 +25,9 @@ type ResourceConfig struct {
 	MinNodes                         int32                            `yaml:"minNodes"`
 	MaxNodes                         int32                            `yaml:"maxNodes"`
 	DNSManagement                    bool                             `yaml:"dnsManagement"`
+	DNS01Challenge                   bool                             `yaml:"dns01Challenge"`
 	DNSManagementServiceAccount      DNSManagementServiceAccount      `yaml:"dnsManagementServiceAccount"`
+	DNS01ChallengeServiceAccount     DNS01ChallengeServiceAccount     `yaml:"dns01ChallengeServiceAccount"`
 	StorageManagementServiceAccount  StorageManagementServiceAccount  `yaml:"storageManagementServiceAccount"`
 	ClusterAutoscaling               bool                             `yaml:"clusterAutoscaling"`
 	ClusterAutoscalingServiceAccount ClusterAutoscalingServiceAccount `yaml:"clusterAutoscalingServiceAccount"`
@@ -48,6 +50,14 @@ type AvailabilityZone struct {
 // DNSManagementServiceAccount contains the name and namespace for the
 // Kubernetes service account that needs access to manage Route53 DNS records.
 type DNSManagementServiceAccount struct {
+	Name      string `yaml:"name"`
+	Namespace string `yaml:"namespace"`
+}
+
+// DNS01ChallengeServiceAccount contains the name and namespace for the
+// Kubernetes service account that needs access to perform Route53 DNS01
+// challenges.
+type DNS01ChallengeServiceAccount struct {
 	Name      string `yaml:"name"`
 	Namespace string `yaml:"namespace"`
 }

@@ -19,6 +19,7 @@ type ResourceInventory struct {
 	ClusterRole            RoleInventory    `json:"clusterRole"`
 	WorkerRole             RoleInventory    `json:"workerRole"`
 	DNSManagementRole      RoleInventory    `json:"dnsManagementRole"`
+	DNS01ChallengeRole     RoleInventory    `json:"dns01ChallengeRole"`
 	StorageManagementRole  RoleInventory    `json:"storageManagementRole"`
 	ClusterAutoscalingRole RoleInventory    `json:"clusterAutoscalingRole"`
 	PolicyARNs             []string         `json:"policyARNs"`
