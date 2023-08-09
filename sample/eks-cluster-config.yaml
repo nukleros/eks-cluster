@@ -1,5 +1,5 @@
 name: sample-cluster-0
-#region: "us-west-1"
+region: "us-east-1"
 awsAccountID: "575822346426"
 instanceTypes:
   - "t3.micro"
@@ -8,6 +8,10 @@ maxNodes: 6
 dnsManagement: true
 dnsManagementServiceAccount:
   name: external-dns
+  namespace: threeport-ingress
+dns01Challenge: true
+dns01ChallengeServiceAccount:
+  name: cert-manager
   namespace: threeport-ingress
 tags:
   tier: test
