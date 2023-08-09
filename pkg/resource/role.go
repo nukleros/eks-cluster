@@ -13,7 +13,7 @@ const (
 	ClusterRoleName            = "eks-cluster-role"
 	WorkerRoleName             = "eks-cluster-workler-role"
 	DNSManagementRoleName      = "eks-cluster-dns-management-role"
-	DNS01ChallengeRoleName     = "eks-cluster-dn01-challenge-role"
+	DNS01ChallengeRoleName     = "eks-cluster-dns01-challenge-role"
 	ClusterAutoscalingRoleName = "eks-cluster-cluster-autoscaler-role"
 	StorageManagementRoleName  = "eks-cluster-csi-driver-role"
 	ClusterPolicyARN           = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
