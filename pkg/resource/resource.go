@@ -280,10 +280,10 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) err
 			resourceConfig.AWSAccountID, oidcIssuer, &resourceConfig.DNS01ChallengeServiceAccount,
 			resourceConfig.Name)
 		if dns01ChallengeRole != nil {
-			inventory.DNSManagementRole = RoleInventory{
+			inventory.DNS01ChallengeRole = RoleInventory{
 				RoleName:       *dns01ChallengeRole.RoleName,
 				RoleARN:        *dns01ChallengeRole.Arn,
-				RolePolicyARNs: []string{*createdDNSPolicy.Arn},
+				RolePolicyARNs: []string{*createdDNS01ChallengePolicy.Arn},
 			}
 			c.sendInventory(&inventory)
 		}
