@@ -65,6 +65,11 @@ func (c *ResourceClient) CreateDNS01ChallengePolicy(tags *[]types.Tag, clusterNa
 
 	dnsPolicyName := fmt.Sprintf("%s-%s", DNS01ChallengePolicyName, clusterName)
 	dnsPolicyDescription := "Allow cluster services to complete DNS01 challenges"
+
+	// NOTE: As of 8/8/2023, the cert-manager documentation for the DNS01 challenge
+	// IAM policy is incorrect.  The correct policy is below, and was taken from
+	// this stack overflow post:
+	// https://github.com/cert-manager/cert-manager/issues/3079#issuecomment-657795131
 	dnsPolicyDocument := `{
 "Version": "2012-10-17",
 "Statement": [
