@@ -4,18 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 )
 
 const (
-	ClusterRoleName            = "eks-cluster-role"
-	WorkerRoleName             = "eks-cluster-workler-role"
-	DNSManagementRoleName      = "eks-cluster-dns-management-role"
-	DNS01ChallengeRoleName     = "eks-cluster-dns01-challenge-role"
-	ClusterAutoscalingRoleName = "eks-cluster-cluster-autoscaler-role"
-	StorageManagementRoleName  = "eks-cluster-csi-driver-role"
+	ClusterRoleName            = "cluster-role"
+	WorkerRoleName             = "workler-role"
+	DNSManagementRoleName      = "dns-mgmt-role"
+	DNS01ChallengeRoleName     = "dns-chlg-role"
+	ClusterAutoscalingRoleName = "ca-role"
+	StorageManagementRoleName  = "csi-role"
 	ClusterPolicyARN           = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 	WorkerNodePolicyARN        = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
 	ContainerRegistryPolicyARN = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
@@ -28,6 +29,9 @@ func (c *ResourceClient) CreateRoles(tags *[]types.Tag, clusterName string) (*ty
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	clusterRoleName := fmt.Sprintf("%s-%s", ClusterRoleName, clusterName)
+	if err := checkRoleName(clusterRoleName); err != nil {
+		return nil, nil, err
+	}
 	clusterPolicyARN := ClusterPolicyARN
 	clusterRolePolicyDocument := `{
   "Version": "2012-10-17",
@@ -64,6 +68,9 @@ func (c *ResourceClient) CreateRoles(tags *[]types.Tag, clusterName string) (*ty
 	}
 
 	workerRoleName := fmt.Sprintf("%s-%s", WorkerRoleName, clusterName)
+	if err := checkRoleName(workerRoleName); err != nil {
+		return nil, nil, err
+	}
 	workerRolePolicyDocument := `{
   "Version": "2012-10-17",
   "Statement": [
@@ -118,6 +125,9 @@ func (c *ResourceClient) CreateDNSManagementRole(
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
 	dnsManagementRoleName := fmt.Sprintf("%s-%s", DNSManagementRoleName, clusterName)
+	if err := checkRoleName(dnsManagementRoleName); err != nil {
+		return nil, err
+	}
 	dnsManagementRolePolicyDocument := fmt.Sprintf(`{
     "Version": "2012-10-17",
     "Statement": [
@@ -174,6 +184,9 @@ func (c *ResourceClient) CreateDNS01ChallengeRole(
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
 	dns01ChallengeRoleName := fmt.Sprintf("%s-%s", DNS01ChallengeRoleName, clusterName)
+	if err := checkRoleName(dns01ChallengeRoleName); err != nil {
+		return nil, err
+	}
 	dns01ChallengeRolePolicyDocument := fmt.Sprintf(`{
     "Version": "2012-10-17",
     "Statement": [
@@ -230,6 +243,9 @@ func (c *ResourceClient) CreateClusterAutoscalingRole(
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
 	clusterAutoscalingRoleName := fmt.Sprintf("%s-%s", ClusterAutoscalingRoleName, clusterName)
+	if err := checkRoleName(clusterAutoscalingRoleName); err != nil {
+		return nil, err
+	}
 	clusterAutoscalingRolePolicyDocument := fmt.Sprintf(`{
     "Version": "2012-10-17",
     "Statement": [
@@ -285,6 +301,9 @@ func (c *ResourceClient) CreateStorageManagementRole(
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
 	storageManagementRoleName := fmt.Sprintf("%s-%s", StorageManagementRoleName, clusterName)
+	if err := checkRoleName(storageManagementRoleName); err != nil {
+		return nil, err
+	}
 	storagePolicyARN := CSIDriverPolicyARN
 	storageManagementRolePolicyDocument := fmt.Sprintf(`{
     "Version": "2012-10-17",
@@ -380,4 +399,16 @@ func getWorkerPolicyARNs() []string {
 		ContainerRegistryPolicyARN,
 		CNIPolicyARN,
 	}
+}
+
+// checkRoleName ensures role names do not exceed the AWS limit for role name
+// lengths (64 characters).
+func checkRoleName(name string) error {
+	if utf8.RuneCountInString(name) > 64 {
+		return errors.New(fmt.Sprintf(
+			"role name %s too long, must be 64 characters or less", name,
+		))
+	}
+
+	return nil
 }
