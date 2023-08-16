@@ -19,6 +19,7 @@ type ResourceConfig struct {
 	AWSAccountID                     string                           `yaml:"awsAccountID"`
 	KubernetesVersion                string                           `yaml:"kubernetesVersion"`
 	ClusterCIDR                      string                           `yaml:"clusterCIDR"`
+	DesiredAZCount                   int32                            `yaml:"desiredAZCount"`
 	AvailabilityZones                []AvailabilityZone               `yaml:"availabilityZones"`
 	InstanceTypes                    []string                         `yaml:"instanceTypes"`
 	InitialNodes                     int32                            `yaml:"initialNodes"`
@@ -136,8 +137,16 @@ func (r *ResourceConfig) SetAvailabilityZones(resourceClient *ResourceClient) er
 		return nil
 	}
 
+	// set no. availability zones - default to 1 if not specified
+	var desiredAZs int32
+	if r.DesiredAZCount == 0 {
+		desiredAZs = 2
+	} else {
+		desiredAZs = r.DesiredAZCount
+	}
+
 	// otherwise set based on number of desired availability zones
-	availabilityZones, err := resourceClient.GetAvailabilityZonesForRegion(r.Region)
+	availabilityZones, err := resourceClient.GetAvailabilityZonesForRegion(r.Region, desiredAZs)
 	if err != nil {
 		return fmt.Errorf(
 			fmt.Sprintf("failed to get availability zones for region %s", r.Region),

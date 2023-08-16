@@ -7,6 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
+const maxAZCount = int32(3)
+
 // defaultCIDRs returns a set of CIDR blocks for subnets.
 func defaultCIDRs() []string {
 	return []string{
@@ -20,7 +22,7 @@ func defaultCIDRs() []string {
 }
 
 // GetAvailabilityZonesForRegion gets the availability zones for a given region.
-func (c *ResourceClient) GetAvailabilityZonesForRegion(region string) (*[]AvailabilityZone, error) {
+func (c *ResourceClient) GetAvailabilityZonesForRegion(region string, desiredAZs int32) (*[]AvailabilityZone, error) {
 	svc := ec2.NewFromConfig(*c.AWSConfig)
 	var availabilityZones []AvailabilityZone
 	defaultCIDRs := defaultCIDRs()
@@ -40,10 +42,15 @@ func (c *ResourceClient) GetAvailabilityZonesForRegion(region string) (*[]Availa
 	}
 
 	azsSet := int32(0)
-	maxAZCount := int32(3)
+	var azCount int32
+	if desiredAZs > maxAZCount {
+		azCount = maxAZCount
+	} else {
+		azCount = desiredAZs
+	}
 	cidrIndex := 0
 	for _, az := range resp.AvailabilityZones {
-		if azsSet < maxAZCount {
+		if azsSet < azCount {
 			newAZ := AvailabilityZone{
 				Zone:              *az.ZoneName,
 				PrivateSubnetCIDR: defaultCIDRs[cidrIndex],
