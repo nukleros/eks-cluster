@@ -216,6 +216,17 @@ func (c *ResourceClient) CreateResourceStack(resourceConfig *ResourceConfig) err
 	}
 	c.sendMessage(fmt.Sprintf("EKS cluster ready: %s\n", *cluster.Name))
 
+	// EKS Cluster Security Group
+	securityGroupID, err := c.GetClusterSecurityGroup(resourceConfig.Name)
+	if securityGroupID != "" {
+		inventory.SecurityGroupID = securityGroupID
+		c.sendInventory(&inventory)
+	}
+	if err != nil {
+		return err
+	}
+	c.sendMessage(fmt.Sprintf("EKS cluster security group ID %s retrieved", securityGroupID))
+
 	// Node Groups
 	var nodeGroupNames []string
 	nodeGroups, err := c.CreateNodeGroups(&mapTags, *cluster.Name, resourceConfig.KubernetesVersion,

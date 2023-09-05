@@ -26,6 +26,7 @@ type ResourceInventory struct {
 	Cluster                ClusterInventory `json:"cluster"`
 	NodeGroupNames         []string         `json:"nodeGroupNames"`
 	OIDCProviderARN        string           `json:"oidcProviderARN"`
+	SecurityGroupID        string           `json:"securityGroupID"`
 }
 
 // RoleInventory contains the details for each role created.
