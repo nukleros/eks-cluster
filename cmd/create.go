@@ -27,6 +27,14 @@ var createCmd = &cobra.Command{
 	Short: "Provision an EKS cluster in AWS",
 	Long:  `Provision an EKS cluster in AWS.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// load AWS config
+		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "", awsRoleArn)
+		if err != nil {
+			return fmt.Errorf("failed to load AWS config: %w", err)
+		}
+
+		// create resource client
+		resourceClient := resource.CreateResourceClient(awsConfig)
 
 		// load config resource config
 		resourceConfig := resource.NewResourceConfig()

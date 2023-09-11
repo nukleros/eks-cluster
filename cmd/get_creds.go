@@ -23,7 +23,7 @@ var getCredsCmd = &cobra.Command{
 	Long:  `Get credentials to connect to EKS cluster.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// load AWS config
-		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "", awsRoleArn, awsSerialNumber)
+		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "", awsRoleArn)
 		if err != nil {
 			return fmt.Errorf("failed to load AWS config: %w", err)
 		}

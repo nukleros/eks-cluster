@@ -93,19 +93,8 @@ func NewResourceConfig() *ResourceConfig {
 
 // LoadAWSConfig loads the AWS config from environment or shared config profile
 // and overrides the default region if provided.
-func LoadAWSConfig(
-	configEnv bool,
-	configProfile,
-	region,
-	roleArn,
-	serialNumber string,
-) (*aws.Config, error) {
-	configOptions := []func(*config.LoadOptions) error{
-		config.WithSharedConfigProfile(configProfile),
-		config.WithRegion(region),
-	}
+func LoadAWSConfig(configEnv bool, configProfile, region, roleArn string) (*aws.Config, error) {
 
-	// load config from filesystem
 	awsConfig, err := config.LoadDefaultConfig(
 		context.Background(),
 		configOptions...,
@@ -114,58 +103,26 @@ func LoadAWSConfig(
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	// if serialNumber is provided, request MFA token and get temporary credentials
-	if serialNumber != "" {
-		stsClient := sts.NewFromConfig(awsConfig)
-
-		// get MFA token from user
-		tokenCode, err := stscreds.StdinTokenProvider()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get token code: %w", err)
-		}
-
-		// generate temporary credentials
-		sessionToken, err := stsClient.GetSessionToken(
-			context.Background(),
-			&sts.GetSessionTokenInput{
-				SerialNumber: &serialNumber,
-				TokenCode:    &tokenCode,
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get session token: %w", err)
-		}
-
-		// update configOptions with session token
-		configOptions = append(
-			configOptions,
-			config.WithCredentialsProvider(
-				credentials.NewStaticCredentialsProvider(
-					*sessionToken.Credentials.AccessKeyId,
-					*sessionToken.Credentials.SecretAccessKey,
-					*sessionToken.Credentials.SessionToken,
-				),
-			))
-
-		// update aws config with session token
+	if roleArn != "" {
+		assumeRoleProvider := stscreds.NewAssumeRoleProvider(
+			sts.NewFromConfig(awsConfig),
+			roleArn,
+			func(o *stscreds.AssumeRoleOptions) {
+				o.ExternalID = aws.String("externalID")
+				o.TokenProvider = stscreds.StdinTokenProvider
+			})
 		awsConfig, err = config.LoadDefaultConfig(
 			context.Background(),
-			configOptions...,
+			config.WithRegion(region),
+			config.WithSharedConfigProfile(configProfile),
+			config.WithCredentialsProvider(assumeRoleProvider),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load AWS config: %w", err)
 		}
-	}
-
-	// assume role if roleArn is provided
-	if roleArn != "" {
-		awsConfig, err = assumeRole(roleArn, awsConfig, configOptions)
-		if err != nil {
-			return nil, fmt.Errorf("failed to assume role: %w", err)
-		}
 		return &awsConfig, err
-	}
 
+	}
 	return &awsConfig, err
 }
 
