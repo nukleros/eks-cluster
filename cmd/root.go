@@ -38,6 +38,7 @@ precedence.
 var (
 	awsConfigEnv     bool
 	awsConfigProfile string
+	awsRoleArn       string
 	inventoryFile    string
 )
 
@@ -56,4 +57,6 @@ func init() {
 		"The AWS config profile to draw credentials from when provisioning resources")
 	rootCmd.PersistentFlags().BoolVarP(&awsConfigEnv, "aws-config-env", "e", false,
 		"Retrieve credentials from environment variables")
+	rootCmd.PersistentFlags().StringVarP(&awsRoleArn, "aws-role-arn", "r", "",
+		"The AWS role ARN to assume when provisioning resources")
 }

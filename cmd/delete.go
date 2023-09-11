@@ -21,7 +21,7 @@ var deleteCmd = &cobra.Command{
 	Long:  `Remove an EKS cluster from AWS.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// load AWS config
-		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "")
+		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "", awsRoleArn)
 		if err != nil {
 			return fmt.Errorf("failed to load AWS config: %w", err)
 		}

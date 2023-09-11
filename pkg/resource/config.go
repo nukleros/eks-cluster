@@ -8,6 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 const DefaultKubernetesVersion = "1.26"
@@ -91,7 +93,8 @@ func NewResourceConfig() *ResourceConfig {
 
 // LoadAWSConfig loads the AWS config from environment or shared config profile
 // and overrides the default region if provided.
-func LoadAWSConfig(configEnv bool, configProfile, region string) (*aws.Config, error) {
+func LoadAWSConfig(configEnv bool, configProfile, region, roleArn string) (*aws.Config, error) {
+
 	awsConfig, err := config.LoadDefaultConfig(
 		context.Background(),
 		config.WithRegion(region),
@@ -101,6 +104,26 @@ func LoadAWSConfig(configEnv bool, configProfile, region string) (*aws.Config, e
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
+	if roleArn != "" {
+		assumeRoleProvider := stscreds.NewAssumeRoleProvider(
+			sts.NewFromConfig(awsConfig),
+			roleArn,
+			func(o *stscreds.AssumeRoleOptions) {
+				o.ExternalID = aws.String("externalID")
+				o.TokenProvider = stscreds.StdinTokenProvider
+			})
+		awsConfig, err = config.LoadDefaultConfig(
+			context.Background(),
+			config.WithRegion(region),
+			config.WithSharedConfigProfile(configProfile),
+			config.WithCredentialsProvider(assumeRoleProvider),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		}
+		return &awsConfig, err
+
+	}
 	return &awsConfig, err
 }
 
