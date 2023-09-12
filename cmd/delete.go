@@ -27,7 +27,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		// load AWS config
-		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "", awsRoleArn)
+		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, inventory.Region, awsRoleArn, awsSerialNumber)
 		if err != nil {
 			return fmt.Errorf("failed to load AWS config: %w", err)
 		}
