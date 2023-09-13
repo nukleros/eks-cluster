@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -25,14 +24,14 @@ func (c *ResourceClient) GetClusterSecurityGroup(clusterName string) (string, er
 	}
 	resp, err := svc.DescribeSecurityGroups(c.Context, &describeSecurityGroupsInput)
 	if err != nil {
-		return "", fmt.Errorf("failed to describe security groups filtered by cluster name %s", clusterName)
+		return "", fmt.Errorf("failed to describe security groups filtered by cluster name %s: %w", clusterName, err)
 	}
 
 	if len(resp.SecurityGroups) == 0 {
-		return "", errors.New(fmt.Sprintf("found zero security groups filtered by cluster name %s", clusterName))
+		return "", fmt.Errorf("found zero security groups filtered by cluster name %s", clusterName)
 	}
 	if len(resp.SecurityGroups) > 1 {
-		return "", errors.New(fmt.Sprintf("found multiple security groups filtered by cluster name %s", clusterName))
+		return "", fmt.Errorf("found multiple security groups filtered by cluster name %s", clusterName)
 	}
 
 	return *resp.SecurityGroups[0].GroupId, nil

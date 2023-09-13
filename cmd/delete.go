@@ -20,8 +20,14 @@ var deleteCmd = &cobra.Command{
 	Short: "Remove an EKS cluster from AWS",
 	Long:  `Remove an EKS cluster from AWS.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// load inventory
+		inventory, err := resource.ReadInventory(deleteInventoryFile)
+		if err != nil {
+			return fmt.Errorf("failed to read eks cluster inventory: %s\n", err)
+		}
+
 		// load AWS config
-		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, "")
+		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, inventory.Region, awsRoleArn, awsSerialNumber)
 		if err != nil {
 			return fmt.Errorf("failed to load AWS config: %w", err)
 		}
@@ -44,12 +50,6 @@ var deleteCmd = &cobra.Command{
 				}
 			}
 		}()
-
-		// load inventory
-		inventory, err := resource.ReadInventory(deleteInventoryFile)
-		if err != nil {
-			return fmt.Errorf("failed to read eks cluster inventory: %s\n", err)
-		}
 
 		// delete eks cluster resources
 		err = resourceClient.DeleteResourceStack(inventory)
