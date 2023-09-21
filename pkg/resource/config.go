@@ -103,6 +103,10 @@ func LoadAWSConfig(
 	configOptions := []func(*config.LoadOptions) error{
 		config.WithSharedConfigProfile(configProfile),
 		config.WithRegion(region),
+		config.WithAssumeRoleCredentialOptions(
+			func(o *stscreds.AssumeRoleOptions) {
+				o.TokenProvider = stscreds.StdinTokenProvider
+			}),
 	}
 
 	// load config from filesystem

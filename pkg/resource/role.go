@@ -12,7 +12,7 @@ import (
 
 const (
 	ClusterRoleName            = "cluster-role"
-	WorkerRoleName             = "workler-role"
+	WorkerRoleName             = "worker-role"
 	DNSManagementRoleName      = "dns-mgmt-role"
 	DNS01ChallengeRoleName     = "dns-chlg-role"
 	ClusterAutoscalingRoleName = "ca-role"
