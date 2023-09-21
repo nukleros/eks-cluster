@@ -29,8 +29,8 @@
     ]
   },
   "workerRole": {
-    "roleName": "eks-cluster-workler-role",
-    "roleARN": "arn:aws:iam::575822346426:role/eks-cluster-workler-role",
+    "roleName": "eks-cluster-worker-role",
+    "roleARN": "arn:aws:iam::575822346426:role/eks-cluster-worker-role",
     "rolePolicyARNs": [
       "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
       "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
