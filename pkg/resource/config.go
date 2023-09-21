@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -103,6 +104,10 @@ func LoadAWSConfig(
 	configOptions := []func(*config.LoadOptions) error{
 		config.WithSharedConfigProfile(configProfile),
 		config.WithRegion(region),
+		config.WithAssumeRoleCredentialOptions(
+			func(o *stscreds.AssumeRoleOptions) {
+				o.TokenProvider = stscreds.StdinTokenProvider
+			}),
 	}
 
 	// load config from filesystem
