@@ -41,7 +41,7 @@ var createCmd = &cobra.Command{
 		}
 
 		// load AWS config
-		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, resourceConfig.Region, awsRoleArn, awsSerialNumber)
+		awsConfig, err := resource.LoadAWSConfig(awsConfigEnv, awsConfigProfile, resourceConfig.Region, awsRoleArn, awsExternalId, awsSerialNumber)
 		if err != nil {
 			return fmt.Errorf("failed to load AWS config: %w", err)
 		}
