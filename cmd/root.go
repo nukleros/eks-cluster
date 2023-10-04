@@ -39,6 +39,7 @@ var (
 	awsConfigEnv     bool
 	awsConfigProfile string
 	awsRoleArn       string
+	awsExternalId    string
 	awsSerialNumber  string
 	inventoryFile    string
 )
@@ -60,6 +61,8 @@ func init() {
 		"Retrieve credentials from environment variables")
 	rootCmd.PersistentFlags().StringVarP(&awsRoleArn, "aws-role-arn", "r", "",
 		"The AWS role ARN to assume when provisioning resources")
+	rootCmd.PersistentFlags().StringVar(&awsExternalId, "aws-external-id", "",
+		"The AWS external ID to use when assuming a role")
 	rootCmd.PersistentFlags().StringVarP(&awsSerialNumber, "aws-serial-number", "s", "",
 		"The AWS serial number to use when authenticating via MFA")
 }
