@@ -94,7 +94,7 @@ func NewResourceConfig() *ResourceConfig {
 // LoadAWSConfig loads the AWS config from environment or shared config profile
 // and overrides the default region if provided.
 func LoadAWSConfig(
-	configEnv bool,
+	configEnv bool, // what's this for?
 	configProfile,
 	region,
 	roleArn,
@@ -103,14 +103,22 @@ func LoadAWSConfig(
 ) (*aws.Config, error) {
 	configOptions := []func(*config.LoadOptions) error{}
 
-	if region != "" {
-		configOptions = append(configOptions, config.WithRegion(region))
-	}
 	if configProfile != "" {
-		configOptions = append(configOptions, config.WithSharedConfigProfile(configProfile))
+		configOptions = append(
+			configOptions,
+			config.WithSharedConfigProfile(configProfile),
+		)
 	}
 
-	configOptions = append(configOptions,
+	if region != "" {
+		configOptions = append(
+			configOptions,
+			config.WithRegion(region),
+		)
+	}
+
+	configOptions = append(
+		configOptions,
 		config.WithAssumeRoleCredentialOptions(
 			func(o *stscreds.AssumeRoleOptions) {
 				o.TokenProvider = stscreds.StdinTokenProvider
@@ -198,7 +206,10 @@ func LoadAWSConfigFromAPIKeys(
 	configOptions := []func(*config.LoadOptions) error{}
 
 	if region != "" {
-		configOptions = append(configOptions, config.WithRegion(region))
+		configOptions = append(
+			configOptions,
+			config.WithRegion(region),
+		)
 	}
 
 	if accessKeyID != "" && secretAccessKey != "" {
