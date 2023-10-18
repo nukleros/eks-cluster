@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -129,17 +130,18 @@ func LoadAWSConfig(
 	)
 
 	// load config from filesystem
-	awsConfig, err := config.LoadDefaultConfig(
+	defaultConfig, err := config.LoadDefaultConfig(
 		context.Background(),
 		configOptions...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
+	awsConfig := &defaultConfig
 
 	// if serialNumber is provided, request MFA token and get temporary credentials
 	if serialNumber != "" {
-		stsClient := sts.NewFromConfig(awsConfig)
+		stsClient := sts.NewFromConfig(*awsConfig)
 
 		// get MFA token from user
 		tokenCode, err := stscreds.StdinTokenProvider()
@@ -171,25 +173,26 @@ func LoadAWSConfig(
 			))
 
 		// update aws config with session token
-		awsConfig, err = config.LoadDefaultConfig(
+		defaultConfig, err = config.LoadDefaultConfig(
 			context.Background(),
 			configOptions...,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load AWS config: %w", err)
 		}
+		awsConfig = &defaultConfig
 	}
 
 	// assume role if roleArn is provided
 	if roleArn != "" {
-		awsConfig, err = AssumeRole(roleArn, externalId, awsConfig, configOptions)
+		awsConfig, err = AssumeRole(roleArn, "", externalId, 0, *awsConfig, configOptions)
 		if err != nil {
 			return nil, fmt.Errorf("failed to assume role: %w", err)
 		}
-		return &awsConfig, err
+		return awsConfig, err
 	}
 
-	return &awsConfig, err
+	return awsConfig, err
 }
 
 // LoadAWSConfigFromAPIKeys returns an AWS config from static API keys and
@@ -201,6 +204,7 @@ func LoadAWSConfigFromAPIKeys(
 	token,
 	region,
 	roleArn,
+	roleSessionName,
 	externalId string,
 ) (*aws.Config, error) {
 	configOptions := []func(*config.LoadOptions) error{}
@@ -225,34 +229,47 @@ func LoadAWSConfigFromAPIKeys(
 		)
 	}
 
-	awsConfig, err := config.LoadDefaultConfig(
+	if roleSessionName != "" {
+		configOptions = append(
+			configOptions,
+			config.WithAssumeRoleCredentialOptions(
+				func(o *stscreds.AssumeRoleOptions) {
+					o.RoleSessionName = roleSessionName
+				}),
+		)
+	}
+
+	config, err := config.LoadDefaultConfig(
 		context.Background(),
 		configOptions...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config from static API keys: %w", err)
 	}
+	awsConfig := &config
 
 	// assume role if roleArn is provided
 	if roleArn != "" {
-		awsConfig, err = AssumeRole(roleArn, externalId, awsConfig, configOptions)
+		awsConfig, err = AssumeRole(roleArn, roleSessionName, externalId, 0, *awsConfig, configOptions)
 		if err != nil {
 			return nil, fmt.Errorf("failed to assume role: %w", err)
 		}
-		return &awsConfig, err
+		return awsConfig, err
 	}
 
-	return &awsConfig, err
+	return awsConfig, err
 }
 
 // AssumeRole returns an AWS config with temporary credentials
 // from an assumed role.
 func AssumeRole(
 	roleArn,
+	roleSessionName,
 	externalId string,
+	sessionDuration int32,
 	awsConfig aws.Config,
 	configOptions []func(*config.LoadOptions) error,
-) (aws.Config, error) {
+) (*aws.Config, error) {
 
 	// create assume role provider
 	assumeRoleProvider := stscreds.NewAssumeRoleProvider(
@@ -261,6 +278,12 @@ func AssumeRole(
 		func(o *stscreds.AssumeRoleOptions) {
 			if externalId != "" {
 				o.ExternalID = aws.String(externalId)
+			}
+			if sessionDuration != 0 {
+				o.Duration = time.Duration(sessionDuration) * time.Second
+			}
+			if roleSessionName != "" {
+				o.RoleSessionName = roleSessionName
 			}
 		},
 	)
@@ -277,10 +300,10 @@ func AssumeRole(
 		configOptions...,
 	)
 	if err != nil {
-		return aws.Config{}, fmt.Errorf("failed to load AWS config: %w", err)
+		return &aws.Config{}, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	return awsConfig, err
+	return &awsConfig, err
 }
 
 func (r *ResourceConfig) SetAvailabilityZones(resourceClient *ResourceClient) error {
