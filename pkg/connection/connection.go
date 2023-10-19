@@ -74,24 +74,6 @@ func (c *EKSClusterConnectionInfo) Get(awsConfig *aws.Config) error {
 		Session:   awsSession,
 	}
 
-	// svcSts := sts.NewFromConfig(*awsConfig)
-	// callerIdentity, err := svcSts.GetCallerIdentity(
-	// 	context.Background(),
-	// 	&sts.GetCallerIdentityInput{},
-	// )
-	// if err != nil {
-	// 	return fmt.Errorf("failed to get caller identity: %w", err)
-	// }
-
-	// // set AssumeRoleARN if a role ARN is found
-	// assumeRoleARN, err := extractRoleARN(awsConfig)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to extract role ARN: %w", err)
-	// }
-	// if assumeRoleARN != "" {
-	// 	opts.AssumeRoleARN = assumeRoleARN
-	// }
-
 	tkn, err := gen.GetWithOptions(opts)
 	if err != nil {
 		return fmt.Errorf("failed to get token with options: %w", err)
