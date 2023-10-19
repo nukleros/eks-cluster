@@ -91,29 +91,3 @@ func (c *EKSClusterConnectionInfo) Get(awsConfig *aws.Config) error {
 
 	return nil
 }
-
-// extractRoleARN extracts the role ARN from an IAM role if it is found.
-func extractRoleARN(awsConfig *aws.Config) (string, error) {
-
-	svcSts := sts.NewFromConfig(*awsConfig)
-
-	callerIdentity, err := svcSts.GetCallerIdentity(
-		context.Background(),
-		&sts.GetCallerIdentityInput{},
-	)
-	if err != nil {
-		return "", fmt.Errorf("failed to get caller identity: %w", err)
-	}
-
-	// split the input string by '/'
-	parts := strings.Split(*callerIdentity.Arn, "/")
-
-	// ensure there are at least two parts (assumed-role and the role name)
-	if len(parts) >= 2 {
-		// Join the parts up to the second-to-last one using '/' as the separator
-		return strings.Join(parts[:len(parts)-1], "/"), nil
-	}
-
-	// return empty string if no ARN is found
-	return "", nil
-}
