@@ -95,7 +95,7 @@ func NewResourceConfig() *ResourceConfig {
 // LoadAWSConfig loads the AWS config from environment or shared config profile
 // and overrides the default region if provided.
 func LoadAWSConfig(
-	configEnv bool, // what's this for?
+	configEnv bool,
 	configProfile,
 	region,
 	roleArn,
@@ -104,6 +104,7 @@ func LoadAWSConfig(
 ) (*aws.Config, error) {
 	configOptions := []func(*config.LoadOptions) error{}
 
+	// load shared config profile if provided
 	if configProfile != "" {
 		configOptions = append(
 			configOptions,
@@ -111,6 +112,7 @@ func LoadAWSConfig(
 		)
 	}
 
+	// use specified region if provided
 	if region != "" {
 		configOptions = append(
 			configOptions,
@@ -118,6 +120,7 @@ func LoadAWSConfig(
 		)
 	}
 
+	// use external id if provided
 	configOptions = append(
 		configOptions,
 		config.WithAssumeRoleCredentialOptions(
@@ -185,7 +188,7 @@ func LoadAWSConfig(
 
 	// assume role if roleArn is provided
 	if roleArn != "" {
-		awsConfig, err = AssumeRole(roleArn, "", externalId, 0, *awsConfig, configOptions)
+		awsConfig, err = AssumeRole(roleArn, "", externalId, 3600, *awsConfig, configOptions)
 		if err != nil {
 			return nil, fmt.Errorf("failed to assume role: %w", err)
 		}
@@ -209,6 +212,7 @@ func LoadAWSConfigFromAPIKeys(
 ) (*aws.Config, error) {
 	configOptions := []func(*config.LoadOptions) error{}
 
+	// use specified region if provided
 	if region != "" {
 		configOptions = append(
 			configOptions,
@@ -216,6 +220,7 @@ func LoadAWSConfigFromAPIKeys(
 		)
 	}
 
+	// use static credentials if provided
 	if accessKeyID != "" && secretAccessKey != "" {
 		configOptions = append(
 			configOptions,
@@ -229,6 +234,7 @@ func LoadAWSConfigFromAPIKeys(
 		)
 	}
 
+	// use role session name if provided
 	if roleSessionName != "" {
 		configOptions = append(
 			configOptions,
@@ -306,6 +312,7 @@ func AssumeRole(
 	return &awsConfig, err
 }
 
+// SetAvailabilityZones sets the availability zones for the resource config.
 func (r *ResourceConfig) SetAvailabilityZones(resourceClient *ResourceClient) error {
 	// ensure region is in resource config
 	if r.Region == "" {
