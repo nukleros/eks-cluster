@@ -24,7 +24,7 @@ type EKSClusterConnectionInfo struct {
 	TokenExpiration time.Time
 }
 
-// Get retrieves connection info for a give EKS cluster by name.
+// Get retrieves connection info for a given EKS cluster by name.
 func (c *EKSClusterConnectionInfo) Get(awsConfig *aws.Config) error {
 	svc := eks.NewFromConfig(*awsConfig)
 
@@ -71,6 +71,7 @@ func (c *EKSClusterConnectionInfo) Get(awsConfig *aws.Config) error {
 		ClusterID: c.ClusterName,
 		Session:   awsSession,
 	}
+
 	tkn, err := gen.GetWithOptions(opts)
 	if err != nil {
 		return fmt.Errorf("failed to get token with options: %w", err)

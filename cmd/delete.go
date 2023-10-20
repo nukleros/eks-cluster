@@ -23,7 +23,7 @@ var deleteCmd = &cobra.Command{
 		// load inventory
 		inventory, err := resource.ReadInventory(deleteInventoryFile)
 		if err != nil {
-			return fmt.Errorf("failed to read eks cluster inventory: %s\n", err)
+			return fmt.Errorf("failed to read eks cluster inventory: %s", err)
 		}
 
 		// load AWS config

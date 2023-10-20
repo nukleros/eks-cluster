@@ -1,4 +1,4 @@
-# eks-clsuter
+# eks-cluster
 
 A CLI and Go library to create and delete EKS clusters in AWS.
 

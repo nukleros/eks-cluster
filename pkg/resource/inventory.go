@@ -2,7 +2,6 @@ package resource
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 )
 
@@ -60,7 +59,7 @@ func WriteInventory(inventoryFile string, inventory *ResourceInventory) error {
 // ReadInventory reads the inventory from the inventory file.
 func ReadInventory(inventoryFile string) (*ResourceInventory, error) {
 	// read inventory file
-	inventoryBytes, err := ioutil.ReadFile(inventoryFile)
+	inventoryBytes, err := os.ReadFile(inventoryFile)
 	if err != nil {
 		return nil, err
 	}

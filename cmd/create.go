@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"syscall"
@@ -31,7 +30,7 @@ var createCmd = &cobra.Command{
 		// load config resource config
 		resourceConfig := resource.NewResourceConfig()
 		if configFile != "" {
-			configYAML, err := ioutil.ReadFile(configFile)
+			configYAML, err := os.ReadFile(configFile)
 			if err != nil {
 				return fmt.Errorf("failed to load resource config: %w", err)
 			}

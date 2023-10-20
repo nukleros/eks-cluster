@@ -29,7 +29,7 @@ func (c *ResourceClient) CreateRoles(tags *[]types.Tag, clusterName string) (*ty
 	svc := iam.NewFromConfig(*c.AWSConfig)
 
 	clusterRoleName := fmt.Sprintf("%s-%s", ClusterRoleName, clusterName)
-	if err := checkRoleName(clusterRoleName); err != nil {
+	if err := CheckRoleName(clusterRoleName); err != nil {
 		return nil, nil, err
 	}
 	clusterPolicyARN := ClusterPolicyARN
@@ -68,7 +68,7 @@ func (c *ResourceClient) CreateRoles(tags *[]types.Tag, clusterName string) (*ty
 	}
 
 	workerRoleName := fmt.Sprintf("%s-%s", WorkerRoleName, clusterName)
-	if err := checkRoleName(workerRoleName); err != nil {
+	if err := CheckRoleName(workerRoleName); err != nil {
 		return nil, nil, err
 	}
 	workerRolePolicyDocument := `{
@@ -125,7 +125,7 @@ func (c *ResourceClient) CreateDNSManagementRole(
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
 	dnsManagementRoleName := fmt.Sprintf("%s-%s", DNSManagementRoleName, clusterName)
-	if err := checkRoleName(dnsManagementRoleName); err != nil {
+	if err := CheckRoleName(dnsManagementRoleName); err != nil {
 		return nil, err
 	}
 	dnsManagementRolePolicyDocument := fmt.Sprintf(`{
@@ -184,7 +184,7 @@ func (c *ResourceClient) CreateDNS01ChallengeRole(
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
 	dns01ChallengeRoleName := fmt.Sprintf("%s-%s", DNS01ChallengeRoleName, clusterName)
-	if err := checkRoleName(dns01ChallengeRoleName); err != nil {
+	if err := CheckRoleName(dns01ChallengeRoleName); err != nil {
 		return nil, err
 	}
 	dns01ChallengeRolePolicyDocument := fmt.Sprintf(`{
@@ -243,7 +243,7 @@ func (c *ResourceClient) CreateClusterAutoscalingRole(
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
 	clusterAutoscalingRoleName := fmt.Sprintf("%s-%s", ClusterAutoscalingRoleName, clusterName)
-	if err := checkRoleName(clusterAutoscalingRoleName); err != nil {
+	if err := CheckRoleName(clusterAutoscalingRoleName); err != nil {
 		return nil, err
 	}
 	clusterAutoscalingRolePolicyDocument := fmt.Sprintf(`{
@@ -301,7 +301,7 @@ func (c *ResourceClient) CreateStorageManagementRole(
 
 	oidcProviderBare := strings.Trim(oidcProvider, "https://")
 	storageManagementRoleName := fmt.Sprintf("%s-%s", StorageManagementRoleName, clusterName)
-	if err := checkRoleName(storageManagementRoleName); err != nil {
+	if err := CheckRoleName(storageManagementRoleName); err != nil {
 		return nil, err
 	}
 	storagePolicyARN := CSIDriverPolicyARN
@@ -401,9 +401,9 @@ func getWorkerPolicyARNs() []string {
 	}
 }
 
-// checkRoleName ensures role names do not exceed the AWS limit for role name
+// CheckRoleName ensures role names do not exceed the AWS limit for role name
 // lengths (64 characters).
-func checkRoleName(name string) error {
+func CheckRoleName(name string) error {
 	if utf8.RuneCountInString(name) > 64 {
 		return errors.New(fmt.Sprintf(
 			"role name %s too long, must be 64 characters or less", name,
